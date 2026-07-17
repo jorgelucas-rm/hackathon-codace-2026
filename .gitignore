@@ -4,6 +4,11 @@
 ### asdf ###
 /.tool-versions
 
+### Docker Compose local data volumes ###
+/database
+/minio
+__pycache__/
+
 ### dotenv ###
 .env
 
