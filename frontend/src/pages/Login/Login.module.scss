@@ -1,0 +1,12 @@
+@use "../../styles/variables" as *;
+
+// Estilos específicos da página — o restante vem das classes globais
+.form {
+    width: 100%;
+    max-width: 360px;
+
+    label {
+        font-size: $font-size-md;
+        font-weight: bold;
+    }
+}

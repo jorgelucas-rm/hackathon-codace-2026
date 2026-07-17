@@ -1,0 +1,84 @@
+@use "./variables" as *;
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: $color-light;
+    color: $color-dark;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+// ---------- Layout ----------
+
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flex-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.full-height {
+    min-height: 100vh;
+}
+
+.gap-sm {
+    gap: $spacing-sm;
+}
+
+.gap-md {
+    gap: $spacing-md;
+}
+
+// ---------- Componentes ----------
+
+.card {
+    border: $border-default;
+    border-radius: $border-radius;
+    padding: $spacing-lg;
+    background-color: $color-light;
+}
+
+.title {
+    font-size: $font-size-lg;
+    font-weight: bold;
+    color: $color-primary;
+}
+
+.input {
+    padding: $spacing-sm;
+    border: $border-default;
+    border-radius: $border-radius;
+    font-size: $font-size-md;
+    outline: none;
+
+    &:focus {
+        border-color: $color-primary;
+    }
+}
+
+.btn {
+    padding: $spacing-sm $spacing-md;
+    border: $border-default;
+    border-radius: $border-radius;
+    font-size: $font-size-md;
+    font-weight: bold;
+    cursor: pointer;
+    background-color: $color-dark;
+    color: $color-primary;
+    transition: opacity 0.2s;
+
+    &:hover {
+        opacity: 0.85;
+    }
+}
