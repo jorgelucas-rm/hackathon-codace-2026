@@ -4,8 +4,21 @@ RUN apk add --no-cache nodejs npm
 
 WORKDIR /app
 
+# `CI=false`: react-scripts trata warning de ESLint como erro de build
+# quando CI=true está setado no ambiente — quebra o build por causa de avisos
+# que não impedem o app de rodar. Sem isso, um `docker build` disparado por
+# uma CI que exporta CI=true globalmente quebraria o build da imagem.
+ENV CI=false
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
 COPY nginx.dev.conf /etc/nginx/conf.d/default.conf
+COPY docker-entrypoint.dev.sh /docker-entrypoint.dev.sh
+RUN chmod +x /docker-entrypoint.dev.sh
 
 EXPOSE 80
 
-CMD ["sh", "-c", "npm install && npm run build -- --watch & nginx -g 'daemon off;'"]
+CMD ["/docker-entrypoint.dev.sh"]

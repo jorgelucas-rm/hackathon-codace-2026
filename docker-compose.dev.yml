@@ -11,6 +11,13 @@ services:
     restart: always
     volumes:
       - ./frontend:/app
+      # Volume anônimo por cima de /app/node_modules: sem isso, o bind mount
+      # acima sobrescreve inteiro o /app do container (inclusive o
+      # node_modules instalado no build da imagem) com o conteúdo do host —
+      # se o host não tiver rodado `npm install`, o container fica sem
+      # dependências. Essa entrada faz o node_modules "vazado" no build da
+      # imagem sobreviver por baixo do mount do código-fonte.
+      - /app/node_modules
 
   backend:
     container_name: codace-backend
