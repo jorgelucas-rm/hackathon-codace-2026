@@ -13,6 +13,7 @@ from src.app.model.entity.sport import Sport
 from src.app.model.enum import ErrorCode
 from src.app.repository.court_repository import CourtRepository
 from src.app.repository.sport_repository import SportRepository
+from src.app.service.photo_upload import resolve_photo_urls
 from src.infra.exception import (
     ConflictException,
     ForbiddenException,
