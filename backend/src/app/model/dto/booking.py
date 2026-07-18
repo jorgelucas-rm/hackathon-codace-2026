@@ -3,6 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.app.model.dto.group import GroupCreateDTO, GroupPanelSummaryDTO
 from src.app.model.dto.payment import PaymentSummaryDTO
 from src.app.model.dto.validators import serializable_enum
 from src.app.model.enum.booking_status import BookingStatus
@@ -28,6 +29,10 @@ class BookingCreateDTO(BaseModel):
     start_time: time
     end_time: time
     type: Optional[str] = Field(default="closed")
+    # T-C (Onda 3, extensão pontual aditiva): payload do grupo quando
+    # `type=group` (`backend-api-e-fluxos.md` §2.6). `None` no caminho
+    # `type=closed`, que continua funcionando sem alteração.
+    group: Optional[GroupCreateDTO] = None
 
     @field_validator("type")
     @classmethod
@@ -56,10 +61,16 @@ class BookingReadDTO(BaseModel):
 
 class BookingCreateResponseDTO(BaseModel):
     """Resposta de `POST /api/bookings`: booking + pagamento pendente a
-    confirmar (contrato Onda 2, `PaymentSummaryDTO` de T-B2)."""
+    confirmar (contrato Onda 2, `PaymentSummaryDTO` de T-B2).
+
+    `group` (T-C, Onda 3, extensão aditiva): resumo do grupo recém-criado
+    quando `type=group` — o pagamento embutido continua sendo o mesmo
+    conceito (a cota do criador, `reference_type="group_member"`, em vez do
+    valor total). `None` no caminho `type=closed`, que não muda."""
 
     booking: BookingReadDTO
     payment: PaymentSummaryDTO
+    group: Optional[GroupPanelSummaryDTO] = None
 
 
 class BookingCancelResponseDTO(BaseModel):

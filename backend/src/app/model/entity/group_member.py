@@ -7,6 +7,7 @@ from sqlalchemy.sql import func, text
 
 from src.app.model.entity.base_model import BaseModel
 from src.app.model.entity.open_group import OpenGroup
+from src.app.model.entity.payment import Payment
 from src.app.model.entity.user import User
 from src.app.model.enum.group_member_status import GroupMemberStatus
 from src.app.model.enum.int_enum_type import IntEnumType
@@ -44,3 +45,4 @@ class GroupMember(BaseModel):
 
     group: Mapped[OpenGroup] = relationship("OpenGroup", backref="members")
     user: Mapped[User] = relationship("User")
+    payment: Mapped[Optional[Payment]] = relationship("Payment")
