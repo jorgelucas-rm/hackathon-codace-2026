@@ -12,7 +12,7 @@ orquestrador conforme `docs/prompt-orquestrador.md`. Branch de integração:
 | 1 | T-A1 Catálogo ∥ T-A2 Perfil+Favoritos | ✅ concluída |
 | 2 | T-B1 Booking+Disponibilidade ∥ T-B2 Pagamento | ✅ concluída |
 | 3 | T-C Grupos ∥ T-D Painel | ✅ concluída |
-| 4 | T-E Notif+Job ∥ T-F Reviews+Seed | ⏳ em andamento |
+| 4 | T-E Notif+Job ∥ T-F Reviews+Seed | ✅ concluída |
 
 ## Matriz-resumo de propriedade
 
@@ -443,3 +443,124 @@ integração da cascata (grupo lota → `confirmed`; cancelamento pela company
 estornando grupo real) previsto no plano original não foi escrito. Registrar
 como próximo passo antes de considerar a Onda 3 "verde" no sentido pleno do
 critério de pronto da seção 6 do `docs/prompt.md`.
+
+## Onda 4 — Notificações + Job ∥ Avaliações + Seed (spec + concluída)
+
+Última onda de execução. Interseção zero por construção (T-E instrumenta
+booking/group/payment nos pontos de extensão já existentes — efeitos de
+pagamento e métodos de service —, nunca a lógica em si; T-F mexe em
+review/company/seed) — sem contrato prévio a commitar, mesmo espírito da
+Onda 1.
+
+| Task | Escopo | Arquivos que possui | Instrumentação aditiva autorizada |
+|---|---|---|---|
+| **T-E Notif + Job** | Fase E inteira: `Notification`, `NotificationService`, rotas (`GET /api/notifications`, `POST /api/notifications/read`), pacote `jobs/` com `process_pending`/`run_loop` (TTL de booking/cota, `process_deadline` de grupos vencidos, `CONFIRMED→COMPLETED`, risco/lembrete) | `entity/notification.py`, `dto/notification.py`, `repository/notification_repository.py`, `service/notification_service.py`, `controller/notification_controller.py`, `jobs/` (novo) | `service/booking_payment_effects.py`, `service/group_payment_effects.py`, `service/group_service.py`, `service/booking_admin_service.py` — só chamadas a `notification_service.create(...)` |
+| **T-F Reviews + Seed** | Fase F inteira: `Review`, travas de elegibilidade, rotas (`POST /bookings/{id}/reviews`, `GET /companies/{id}/reviews`, `POST /reviews/{id}/helpful`), `nota_media` real na busca/detalhe, `db/seed_demo.py` idempotente | `entity/review.py`, `dto/review.py`, `repository/review_repository.py`, `service/review_service.py`, `controller/review_controller.py`, `db/seed_demo.py` (novo) | `service/company_service.py` — só a agregação de `nota_media` (placeholder que T-A1 já tinha deixado explícito) |
+
+Decisões locais dos executores, documentadas no código: T-E trata TTL
+vencido reaproveitando `payment_service.confirm(..., "denied")` (sem
+inventar um `PaymentStatus.EXPIRED` num arquivo proibido — cadeia de
+efeitos já existente cuida do cancelamento em cascata e da notificação);
+job com 5 passos independentes, cada um em sub-transação própria (uma
+falha num passo não impede os seguintes); idempotência de risco/lembrete
+via `NotificationRepository.exists_recent`. T-F acrescentou
+`UniqueConstraint(booking_id, user_id)` no banco (além da checagem em
+nível de aplicação); seed idempotente por chave natural (CNPJ/email/nome
+de court) com bookings/grupos/reviews de demonstração em Fortaleza-CE.
+
+Ordem de merge: **T-E → T-F** → migração única da onda (`notification`,
+`review`).
+
+REGISTRAR aplicado pelo orquestrador:
+
+- `controller/__init__.py`: registrados `notification_controller.router`,
+  `review_controller.router/bookings_router/companies_router`.
+- `model/entity/__init__.py`: registrados `Notification`, `Review`.
+- `repository/__init__.py`: registrados `NotificationRepository`,
+  `ReviewRepository`.
+- `service/__init__.py`: registrados `NotificationService`,
+  `ReviewService`.
+- `main.py` (lifespan): pluga o loop asyncio do job
+  (`jobs.notification_job.run_loop(session_maker)`, `asyncio.create_task`
+  logo após o seed, cancelado no `finally` do lifespan) e a chamada de
+  `seed_demo(session)` ao lado do `seed_sports` já existente, gated por
+  `SEED_DEMO`.
+- Ajuste pontual do orquestrador em `entity/notification.py` (arquivo de
+  T-E): declarado `__table_args__ = (Index("ix_notification_user_id_read",
+  ...),)` — T-E tinha sugerido o índice só na migração manualmente; sem
+  declará-lo no metadata do SQLAlchemy, o autogenerate do Alembic
+  detectaria o índice como "removido" a cada revisão futura (índice
+  existiria só no banco, fora do metadata). Nenhuma outra lógica do
+  arquivo tocada.
+- Migração `64d27fc2cb39_onda_4_notification_review`: tabelas
+  `notification` (+ índice composto `user_id, read`) e `review` (+
+  `UniqueConstraint(booking_id, user_id)`). Aplicada (`alembic upgrade
+  head` a partir de `af1328b0940a`) e confirmada limpa (autogenerate
+  subsequente vazio).
+
+**Verificação de pronto da onda (sem suíte de testes automatizados —
+pulada nesta rodada por instrução explícita do usuário)**: `alembic
+upgrade head` limpo, autogenerate vazio depois; app sobe sem erro,
+`configure_mappers()` ok; **roteiro de ponta a ponta rodado de verdade via
+HTTP** (script Python batendo na API real, não Swagger manual, mas
+equivalente): registrar 2 users + 1 company + 1 court → buscar company →
+ver disponibilidade → criar booking fechado → confirmar pagamento →
+booking `CONFIRMED` → aparece na agenda da company → criar booking `group`
+→ segundo user entra e paga cota → grupo lota (`FULL`) → booking do grupo
+`CONFIRMED` → notificações corretas em ambos os users
+(`booking_confirmed`/`group_joined`/`group_full` no criador,
+`group_full` no segundo membro) — **passou de ponta a ponta**. Job
+(`process_pending`) rodado diretamente duas vezes seguidas sem erro
+(checagem de idempotência). Seed de demo verificado idempotente: reinício
+do app duas vezes manteve as mesmas 4 companies e 2 grupos abertos, sem
+duplicar; `GET /api/companies/1/reviews` retornou reviews reais do seed e
+`nota_media` calculada (não mais `None`) na busca pública.
+
+**Nota de ambiente**: mesma observação da Onda 3 — `.env` de
+desenvolvimento local criado (gitignored) e `database`+`minio` subidos via
+`docker compose -f docker-compose.dev.yml up -d database minio` para os
+testes manuais desta sessão.
+
+**Pendência explícita para quando os testes voltarem a rodar**: nenhuma
+suíte pytest nova foi escrita para T-E/T-F nesta rodada (pedido do
+usuário). O cenário de "grupo com prazo vencido sem mínimo é cancelado
+pelo job com estornos" (parte do critério de pronto da seção 6 do
+`docs/prompt.md`) foi validado pela leitura do código
+(`GroupService.process_deadline`/`cancel_group`, já testados
+manualmente na Onda 3) mas não foi exercitado neste roteiro de ponta a
+ponta desta sessão (exigiria manipular `closing_deadline` para o passado,
+o que o script de verificação não fez). Registrar como próximo passo.
+
+## Fechamento
+
+Todas as 5 ondas de execução (0–4) estão mergeadas em `feat/mvp`, com uma
+migração Alembic por onda (`02d2598303f7` → `12f41c645904` →
+`0d5b73afd62a` → `1aef7416bb48` → `af1328b0940a` → `64d27fc2cb39`), todas
+aplicadas e confirmadas limpas (`alembic upgrade head` sem erro,
+autogenerate subsequente vazio) contra o banco de desenvolvimento local
+desta sessão. App sobe, `/docs`/`/openapi.json` respondem 200, e o roteiro
+de ponta a ponta da seção 6 do `docs/prompt.md` foi exercitado via HTTP
+real cobrindo o caminho principal (cadastro → busca → disponibilidade →
+booking fechado → pagamento → agenda da company → booking em grupo →
+segunda pessoa entra e paga → grupo lota → notificações).
+
+**O que falta para "pronto" no sentido pleno da seção 6**: nenhuma suíte
+pytest foi escrita ou rodada nesta sessão (Ondas 3 e 4), por instrução
+explícita do usuário ("por hora não quero que rode testes... apenas
+implemente"). Antes de considerar o MVP realmente fechado, falta:
+1. Escrever/reativar a suíte pytest para T-C/T-D/T-E/T-F (os testes
+   próprios que cada task card pedia e os testes de integração de onda que
+   o orquestrador escreveu nas Ondas 1/2, mas não nas 3/4).
+2. Rodar a suíte inteira (`pytest`) e confirmar verde.
+3. Exercitar o trecho do roteiro de pronto não coberto nesta sessão:
+   cancelamento de grupo pelo job por prazo vencido sem mínimo (com
+   estornos) e o ciclo completo até `booking.status=completed` +
+   `POST /reviews` de verdade (nesta sessão a nota média foi validada só
+   com dados do seed, não com uma review criada via rota nesta sessão).
+4. Abrir o PR de `feat/mvp` → `develop` (não feito nesta sessão — só
+   commits locais, sem push, conforme o próprio fluxo de trabalho de
+   executores/orquestrador desta rodada).
+
+Branches locais dos executores (não pushadas, histórico preservado para
+auditoria): `feat/mvp-tc`, `feat/mvp-td`, `feat/mvp-te`, `feat/mvp-tf`
+(Onda 3/4) — analogamente às ondas anteriores.
