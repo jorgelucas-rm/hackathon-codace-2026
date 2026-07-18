@@ -31,6 +31,9 @@ class User(BaseModel):
         nullable=False,
     )
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    street: Mapped[Optional[str]] = mapped_column(String(250), nullable=True)
+    number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    zip_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     sports_of_interest: Mapped[list[int]] = mapped_column(

@@ -45,6 +45,9 @@ export interface UserRead {
     situation: boolean;
     avatar?: string | null;
     phone?: string | null;
+    street?: string | null;
+    number?: string | null;
+    zip_code?: string | null;
     latitude?: number | null;
     longitude?: number | null;
     sports_of_interest: number[];

@@ -9,6 +9,7 @@ import { formatHHMM, formatPriceCents as formatCents } from "../../services/book
 import { useMe } from "../../hooks/useMe";
 import { useCompanySearch, useSports } from "../../hooks/useCompanies";
 import { useOpenGroups } from "../../hooks/useGroups";
+import { getSportIcon } from "../../components/icons/SportIcons";
 import { JoinGroupModal } from "../../components/JoinGroupModal/JoinGroupModal";
 import styles from "./Home.module.scss";
 
@@ -101,7 +102,7 @@ export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, onGro
                     <div className={styles["sports-grid"]}>
                         {(sports ?? []).map((sport) => (
                             <button key={sport.id} onClick={() => onSelectSport(sport.id)} className={styles["sport-tile"]}>
-                                <span className={styles["sport-icon"]}>{sport.icon ?? <Trophy width={20} height={20} />}</span>
+                                <span className={styles["sport-icon"]}>{getSportIcon(sport.name, { width: 20, height: 20 }) ?? <Trophy width={20} height={20} />}</span>
                                 <span className={styles["sport-name"]}>{sport.name}</span>
                             </button>
                         ))}

@@ -10,4 +10,5 @@ export type Screen =
     | "match"
     | "openMatches"
     | "profile"
+    | "account"
     | "checkout";

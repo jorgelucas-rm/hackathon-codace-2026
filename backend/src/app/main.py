@@ -9,11 +9,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.app.controller import admin_router, router
 from src.app.jobs.notification_job import run_loop
 from src.app.service.sport_service import seed_sports
+from src.app.service.user_service import seed_avatars
 from src.db.seed_demo import seed_demo
-from src.environments import SEED_DEMO
+from src.environments import MINIO_DEFAULT_BUCKET, SEED_DEMO
 from src.infra.exception import DomainException, global_exception_handler
 from src.infra.middleware import Middleware
 from src.infra.middleware.rate_limiter import limiter
+from src.infra.storage import get_minio_client
 from src.infra.storage.database import session_maker
 
 
@@ -26,6 +28,8 @@ async def lifespan(_: FastAPI):
             seed_demo(session)
     finally:
         session.close()
+
+    seed_avatars(get_minio_client(), MINIO_DEFAULT_BUCKET)
 
     job_task = asyncio.create_task(run_loop(session_maker))
     try:

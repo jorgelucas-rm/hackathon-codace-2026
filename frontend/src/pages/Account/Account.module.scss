@@ -1,0 +1,267 @@
+@use "../../styles/variables" as *;
+
+// ============================================================
+//  Minha Conta — edição de dados pessoais e avatar
+// ============================================================
+
+.container {
+    min-height: 100vh;
+    padding-bottom: 96px;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.inner {
+    max-width: 640px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 $spacing-lg;
+}
+
+.eyebrow {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--primary);
+}
+
+.header {
+    padding: 28px 0 16px;
+    background: linear-gradient(165deg, var(--bg-secondary) 0%, var(--bg) 82%);
+    position: relative;
+}
+
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    margin-bottom: 12px;
+}
+
+.title {
+    margin: 4px 0 0;
+    font-family: $font-display;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+// ---------- Avatar ----------
+
+.avatar-card {
+    margin-top: 16px;
+    padding: 20px;
+    border-radius: $border-radius-xl;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 6px 22px var(--shadow-tint);
+}
+
+.avatar-preview {
+    width: 84px;
+    height: 84px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(173, 153, 0, 0.1);
+    border: 2px solid var(--accent);
+    color: var(--primary);
+    overflow: hidden;
+    margin: 0 auto;
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+.avatar-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.name-preview {
+    margin: 0;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+}
+
+.avatar-picker {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.preset-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.preset-item {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    border: 2px solid var(--border);
+    background: var(--bg-secondary);
+    overflow: hidden;
+    padding: 0;
+    transition: border-color 0.18s;
+
+    &:hover { border-color: var(--primary); }
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+
+// ---------- Formulário ----------
+
+.form-card {
+    margin-top: 14px;
+    padding: 20px;
+    border-radius: $border-radius-xl;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 12px var(--shadow-tint);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text);
+    }
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.field-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-sec);
+}
+
+.field-hint {
+    font-size: 11.5px;
+    color: var(--text-sec);
+}
+
+.segment {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 4px;
+    border-radius: $border-radius-md;
+    background: var(--bg-secondary);
+}
+
+.seg-btn {
+    padding: 10px 4px;
+    border: none;
+    border-radius: $border-radius;
+    background: transparent;
+    color: var(--text-sec);
+    font-size: 12.5px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.seg-active {
+    background: var(--card);
+    color: var(--primary);
+    box-shadow: 0 2px 6px var(--shadow-tint);
+}
+
+.address-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text-sec);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.chip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chip-active {
+    border-color: var(--primary);
+    background: rgba(173, 153, 0, 0.12);
+    color: var(--primary);
+}
+
+.error {
+    margin: 0;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 10px;
+    border-radius: $border-radius-md;
+    background: #FEE2E2;
+    color: $color-danger;
+}
+
+.success {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 0;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 10px;
+    border-radius: $border-radius-md;
+    background: rgba(47, 175, 160, 0.12);
+    color: $color-success;
+}
+
+.save-btn {
+    width: 100%;
+}

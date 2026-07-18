@@ -1,37 +1,49 @@
 import { useState } from "react";
 import {
     MapPin, ChevronRight, LogOut, User, Calendar, Heart,
-    CreditCard, Users,
 } from "lucide-react";
 import { Screen } from "../../types";
 import { ConfirmModal } from "../../components/ConfirmModal/ConfirmModal";
 import { useMe } from "../../hooks/useMe";
 import { useAuth } from "../../contexts/AuthContext";
+import { useMyBookings } from "../Match/hooks/useBookings";
+import { useMyGroups } from "../../hooks/useGroups";
 import styles from "./Profile.module.scss";
 
 interface ProfileProps {
     onNavigate: (screen: Screen) => void;
 }
 
-const STATS = [
-    { v: "47", l: "Reservas" },
-    { v: "132", l: "Partidas" },
-    { v: "4.8", l: "Avaliação" },
-    { v: "28", l: "Amigos" },
-];
+const SKILL_LABELS: Record<string, string> = {
+    BEGINNER: "Iniciante",
+    INTERMEDIATE: "Intermediário",
+    ADVANCED: "Avançado",
+};
 
-const MENU = [
-    { Icon: User, title: "Minha Conta", desc: "Meus dados pessoais" },
-    { Icon: Calendar, title: "Minhas Reservas", desc: "Histórico e próximas reservas" },
-    { Icon: Heart, title: "Favoritos", desc: "Quadras e esportes favoritos" },
-    { Icon: CreditCard, title: "Métodos de Pagamento", desc: "Cartões e formas de pagamento" },
-    { Icon: Users, title: "Amigos", desc: "Convites e conexões" },
+const MENU: { Icon: typeof User; title: string; desc: string; target: Screen }[] = [
+    { Icon: User, title: "Minha Conta", desc: "Meus dados pessoais", target: "account" },
+    { Icon: Calendar, title: "Minhas Reservas", desc: "Histórico e próximas reservas", target: "match" },
+    { Icon: Heart, title: "Favoritos", desc: "Quadras e esportes favoritos", target: "courts" },
 ];
 
 export function Profile({ onNavigate }: ProfileProps) {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const { data: me } = useMe();
     const { logout } = useAuth();
+    const { data: upcomingBookings } = useMyBookings("upcoming");
+    const { data: historyBookings } = useMyBookings("history");
+    const { data: myGroups } = useMyGroups();
+
+    const user = me?.entity;
+
+    // Estatísticas reais — nada mockado: contagens vêm de reservas/grupos do
+    // próprio usuário e do perfil (esportes de interesse, quadras favoritas).
+    const STATS = [
+        { v: String((upcomingBookings?.length ?? 0) + (historyBookings?.length ?? 0)), l: "Reservas" },
+        { v: String(myGroups?.length ?? 0), l: "Partidas" },
+        { v: String(user?.sports_of_interest.length ?? 0), l: "Esportes" },
+        { v: String(user?.favorite_courts.length ?? 0), l: "Favoritos" },
+    ];
 
     return (
         <div className={styles["container"]}>
@@ -45,15 +57,24 @@ export function Profile({ onNavigate }: ProfileProps) {
                 <div className={styles["grid"]}>
                     {/* ---------- Identidade (principal) ---------- */}
                     <section className={styles["identity-card"]}>
-                        <div className={styles["avatar"]}><User width={40} height={40} /></div>
+                        <div className={styles["avatar"]}>
+                            {user?.avatar ? <img src={user.avatar} alt="Avatar" /> : <User width={40} height={40} />}
+                        </div>
                         <div className={styles["identity-info"]}>
-                            <h1 className={styles["name"]}>{me?.entity?.name ?? "Carregando..."}</h1>
+                            <h1 className={styles["name"]}>{user?.name ?? "Carregando..."}</h1>
                             <div className={styles["identity-meta"]}>
-                                <span className={styles["level"]}>{me?.entity?.skill_level ?? "Nível não definido"}</span>
-                                <span className={styles["place"]}><MapPin width={12} height={12} /> Fortaleza, CE</span>
+                                <span className={styles["level"]}>
+                                    {user?.skill_level ? SKILL_LABELS[user.skill_level] ?? user.skill_level : "Nível não definido"}
+                                </span>
+                                {user?.phone && <span className={styles["place"]}><MapPin width={12} height={12} /> {user.phone}</span>}
                             </div>
                         </div>
-                        <button className={`button-secondary ${styles["edit-btn"]}`}>Editar Perfil</button>
+                        <button
+                            className={`button-secondary ${styles["edit-btn"]}`}
+                            onClick={() => onNavigate("account")}
+                        >
+                            Editar Perfil
+                        </button>
                     </section>
 
                     {/* ---------- Estatísticas (secundário) ---------- */}
@@ -69,7 +90,7 @@ export function Profile({ onNavigate }: ProfileProps) {
                     {/* ---------- Menu / navegação ---------- */}
                     <nav className={styles["menu-card"]}>
                         {MENU.map((item) => (
-                            <button key={item.title} className={styles["menu-item"]}>
+                            <button key={item.title} className={styles["menu-item"]} onClick={() => onNavigate(item.target)}>
                                 <div className="icon-box"><item.Icon width={20} height={20} /></div>
                                 <div className={styles["menu-text"]}>
                                     <p>{item.title}</p>

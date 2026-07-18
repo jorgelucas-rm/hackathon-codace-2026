@@ -17,6 +17,9 @@ class UserReadDTO(BaseModel):
     situation: bool
     avatar: Optional[str] = None
     phone: Optional[str] = None
+    street: Optional[str] = None
+    number: Optional[str] = None
+    zip_code: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     sports_of_interest: list[int] = Field(default_factory=list)
@@ -47,6 +50,9 @@ class UserProfileUpdateDTO(BaseModel):
 
     name: Optional[str] = Field(default=None, min_length=1, max_length=250)
     phone: Optional[str] = Field(default=None, max_length=20)
+    street: Optional[str] = Field(default=None, max_length=250)
+    number: Optional[str] = Field(default=None, max_length=20)
+    zip_code: Optional[str] = Field(default=None, max_length=10)
     latitude: Optional[float] = Field(default=None)
     longitude: Optional[float] = Field(default=None)
     sports_of_interest: Optional[list[int]] = Field(default=None)

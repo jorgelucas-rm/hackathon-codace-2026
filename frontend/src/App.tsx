@@ -19,6 +19,7 @@ import Match from "./pages/Match/Match";
 import OpenMatches from "./pages/OpenMatches/OpenMatches";
 import Checkout from "./pages/Checkout/Checkout";
 import Profile from "./pages/Profile/Profile";
+import Account from "./pages/Account/Account";
 import BottomNav from "./components/BottomNav/BottomNav";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -32,6 +33,7 @@ function pathToScreen(pathname: string): Screen {
     if (pathname.startsWith("/open-matches")) return "openMatches";
     if (pathname.startsWith("/match")) return "match";
     if (pathname.startsWith("/checkout")) return "checkout";
+    if (pathname.startsWith("/account")) return "account";
     if (pathname.startsWith("/profile")) return "profile";
     return "home";
 }
@@ -189,6 +191,7 @@ function AppShell() {
                     <Route path="/checkout" element={<CheckoutRoute onNavigate={onNavigate} />} />
                     <Route path="/checkout/:paymentId" element={<CheckoutRoute onNavigate={onNavigate} />} />
                     <Route path="/profile" element={<Profile onNavigate={onNavigate} />} />
+                    <Route path="/account" element={<Account onNavigate={onNavigate} />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

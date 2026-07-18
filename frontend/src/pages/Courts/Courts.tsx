@@ -3,6 +3,7 @@ import { MapPin, Search, SlidersHorizontal, X, Heart, Navigation, Trophy, Star, 
 import { Screen } from "../../types";
 import { formatPriceCents } from "../../services/companies.service";
 import { useCompanySearch, useSports } from "../../hooks/useCompanies";
+import { getSportIcon } from "../../components/icons/SportIcons";
 import styles from "./Courts.module.scss";
 
 interface CourtsProps {
@@ -76,7 +77,7 @@ export function Courts({ onNavigate, onSelectCourt, initialSearch = "", initialS
                                 onClick={() => setActiveSportId(sport.id)}
                                 className={`${styles["filter"]} ${activeSportId === sport.id ? styles["filter-active"] : ""}`}
                             >
-                                {sport.icon ? `${sport.icon} ` : ""}{sport.name}
+                                {getSportIcon(sport.name, { width: 15, height: 15 })}{sport.name}
                             </button>
                         ))}
                     </div>

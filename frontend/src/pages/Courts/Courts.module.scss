@@ -133,6 +133,9 @@
 }
 
 .filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     flex-shrink: 0;
     padding: 8px 15px;
     border-radius: 999px;

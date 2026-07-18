@@ -1,4 +1,8 @@
+import io
+from pathlib import Path
+
 from fastapi import Depends, UploadFile
+from minio import Minio, error
 
 from src.app.adapter import MinioAdapter
 from src.app.model.dto.avatar import AvatarPresetDTO
@@ -18,18 +22,52 @@ from src.infra.exception import ConflictException, NotFoundException
 from src.infra.security import hash_password
 
 AVATAR_OBJECT_PREFIX = "avatar/"
+# Arquivos reais em `src/app/assets/avatars/` (copiados de `frontend/avatars/`
+# — o container do backend não monta o volume do frontend, então os presets
+# precisam de uma cópia própria aqui para o seed poder lê-los do disco).
+AVATAR_ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets" / "avatars"
 # Avatares fixos (nossos) vivem no mesmo prefixo que os uploads dos usuários,
 # para não exigir um fluxo de busca/listagem separado no bucket.
 AVATAR_PRESET_FILENAMES = [
     "avatar_00.svg",
-    "avatar_1.svg",
-    "avatar_2.svg",
-    "avatar_3.svg",
-    "avatar_4.svg",
-    "avatar_5.svg",
+    "avatar_01.svg",
+    "avatar_02.svg",
+    "avatar_03.svg",
+    "avatar_04.svg",
+    "avatar_05.svg",
+    "avatar_06.svg",
+    "avatar_07.svg",
 ]
 AVATAR_PRESET_KEYS = {f"{AVATAR_OBJECT_PREFIX}{name}" for name in AVATAR_PRESET_FILENAMES}
 DEFAULT_AVATAR = f"{AVATAR_OBJECT_PREFIX}avatar_00.svg"
+
+
+def seed_avatars(minio_client: Minio, bucket: str) -> None:
+    """Seed idempotente dos avatares padrão no MinIO — sobe cada arquivo de
+    `AVATAR_ASSETS_DIR` para `avatar/<filename>` só se ainda não existir no
+    bucket, para que os presets em `AVATAR_PRESET_FILENAMES` sempre resolvam
+    para uma URL pré-assinada válida.
+    """
+    if not minio_client.bucket_exists(bucket):
+        minio_client.make_bucket(bucket)
+
+    for filename in AVATAR_PRESET_FILENAMES:
+        object_name = f"{AVATAR_OBJECT_PREFIX}{filename}"
+        try:
+            minio_client.stat_object(bucket_name=bucket, object_name=object_name)
+            continue
+        except error.S3Error as e:
+            if e.code not in ("NoSuchKey", "NoSuchBucket"):
+                raise
+
+        content = (AVATAR_ASSETS_DIR / filename).read_bytes()
+        minio_client.put_object(
+            bucket_name=bucket,
+            object_name=object_name,
+            data=io.BytesIO(content),
+            length=len(content),
+            content_type="image/svg+xml",
+        )
 
 
 class UserService:
