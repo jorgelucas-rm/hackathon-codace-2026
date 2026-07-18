@@ -11,6 +11,7 @@ from src.app.model.enum import ErrorCode
 from src.app.model.enum.booking_status import BookingStatus
 from src.app.model.enum.booking_type import BookingType
 from src.app.repository.booking_repository import BookingRepository
+from src.app.repository.notification_repository import NotificationRepository
 from src.app.repository.payment_repository import PaymentRepository
 from src.app.service.availability_service import (
     _find_opening_hours_for_date,
@@ -18,6 +19,7 @@ from src.app.service.availability_service import (
 )
 from src.app.service.booking_service import BookingService
 from src.app.service.group_service import GroupService
+from src.app.service.notification_service import NotificationService
 from src.app.service.payment_service import PaymentService
 from src.infra.exception import (
     BadRequestException,
@@ -197,10 +199,32 @@ class BookingAdminService:
 
         group_canceled = False
         if group_id is not None:
+            # Cascata: `GroupService.cancel_group` já notifica todos os
+            # membros afetados (`group_canceled`, `service/group_service.py`)
+            # — não duplica aqui com uma notificação de booking.
             self.group_service.cancel_group(
                 group_id=group_id, reason="canceled_by_company", commit=True
             )
             group_canceled = True
+        elif booking.creator_user_id is not None:
+            # T-E (Onda 4): sem grupo envolvido — notifica o criador
+            # diretamente aqui (booking "solo" cancelado pelo
+            # estabelecimento, backend-api-e-fluxos.md §3.5).
+            notification_service = NotificationService(
+                notification_repository=NotificationRepository(
+                    session=self.booking_repository.session
+                )
+            )
+            notification_service.create(
+                user_id=booking.creator_user_id,
+                type="booking_canceled",
+                title="Reserva cancelada pelo estabelecimento",
+                body="O estabelecimento cancelou sua reserva e o valor foi estornado.",
+                reference_type="booking",
+                reference_id=booking.id,
+                session=self.booking_repository.session,
+            )
+            self.booking_repository.session.commit()
 
         return booking, refunded, group_canceled
 

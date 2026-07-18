@@ -28,11 +28,13 @@ from src.app.model.enum.payment_status import PaymentStatus
 from src.app.repository.booking_repository import BookingRepository
 from src.app.repository.group_member_repository import GroupMemberRepository
 from src.app.repository.group_repository import GroupRepository
+from src.app.repository.notification_repository import NotificationRepository
 from src.app.repository.payment_repository import PaymentRepository
 from src.app.service.availability_service import (
     _find_opening_hours_for_date,
     _parse_hhmm,
 )
+from src.app.service.notification_service import NotificationService
 from src.app.service.payment_service import PaymentService
 from src.environments import REFUND_DEADLINE_HOURS
 from src.infra.exception import (
@@ -164,6 +166,37 @@ class GroupService:
             user_avatar=member.user.avatar if member.user else None,
             status=member.status.name,
             joined_at=member.joined_at,
+        )
+
+    # ------------------------------------------------------------------
+    # Notificações (T-E, Onda 4) — instrumentação pontual aditiva, só
+    # `notification_service.create(...)`, sem alterar a lógica de estado
+    # acima/abaixo. Reaproveita a sessão dos repositórios já injetados
+    # (mesma transação — `add()` sem commit extra, mesmo padrão do resto do
+    # arquivo).
+    # ------------------------------------------------------------------
+
+    def _notify(
+        self,
+        user_id: int,
+        type: str,
+        title: str,
+        body: str,
+        group_id: int,
+    ) -> None:
+        notification_service = NotificationService(
+            notification_repository=NotificationRepository(
+                session=self.group_repository.session
+            )
+        )
+        notification_service.create(
+            user_id=user_id,
+            type=type,
+            title=title,
+            body=body,
+            reference_type="group",
+            reference_id=group_id,
+            session=self.group_repository.session,
         )
 
     def _filled_spots(self, group_id: int) -> int:
@@ -416,6 +449,17 @@ class GroupService:
             group.status = GroupStatus.OPEN
             group = self.group_repository.add(entity=group)
 
+        if booking and booking.creator_user_id is not None:
+            # Avisa o criador que alguém saiu (backend-api-e-fluxos.md
+            # §3.3: "os membros são notificados").
+            self._notify(
+                user_id=booking.creator_user_id,
+                type="group_left",
+                title="Alguém saiu do seu grupo",
+                body="Uma vaga foi reaberta no seu grupo.",
+                group_id=group.id,
+            )
+
         self.group_repository.commit()
 
         return GroupLeaveResponseDTO(
@@ -456,6 +500,17 @@ class GroupService:
             member.status = GroupMemberStatus.LEFT
             self.group_member_repository.add(entity=member)
 
+            # Notifica todos os membros que tinham cota aprovada/pendente
+            # (backend-api-e-fluxos.md §3.4/3.5: "estorna todas as cotas;
+            # notifica todos" / "notifica todos").
+            self._notify(
+                user_id=member.user_id,
+                type="group_canceled",
+                title="Grupo cancelado",
+                body=f"O grupo foi cancelado ({reason}).",
+                group_id=group.id,
+            )
+
         if group.status != GroupStatus.CANCELED:
             group.status = GroupStatus.CANCELED
             self.group_repository.add(entity=group)
@@ -485,6 +540,7 @@ class GroupService:
 
         confirmed_count = self.group_member_repository.count_confirmed(group.id)
         if confirmed_count >= group.min_spots:
+            was_full = group.status == GroupStatus.FULL
             group.status = GroupStatus.CONFIRMED
             self.group_repository.add(entity=group)
 
@@ -492,6 +548,24 @@ class GroupService:
             if booking and booking.status == BookingStatus.PENDING:
                 booking.status = BookingStatus.CONFIRMED
                 self.booking_repository.add(entity=booking)
+
+            if not was_full:
+                # `game_confirmed`: confirmado pelo job com o mínimo
+                # atingido sem lotar (distinto de `group_full`, que já
+                # notifica "jogo confirmado" no instante em que a última
+                # vaga é preenchida — `group_payment_effects.py`). Evita
+                # notificar duas vezes o mesmo evento quando o grupo já
+                # tinha sido lotado antes do prazo.
+                for confirmed_member in self.group_member_repository.get_confirmed_by_group(
+                    group.id
+                ):
+                    self._notify(
+                        user_id=confirmed_member.user_id,
+                        type="game_confirmed",
+                        title="Jogo confirmado!",
+                        body="O grupo atingiu o mínimo de vagas no prazo — o jogo está confirmado.",
+                        group_id=group.id,
+                    )
 
             self.group_repository.commit()
         else:
