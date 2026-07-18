@@ -1,8 +1,9 @@
 // Service de autenticação.
-// A estrutura de integração já está pronta — enquanto o backend não é usado,
-// as funções resolvem com dados mockados (troque MOCK_AUTH para false para integrar).
+// Integração real com o backend (FastAPI, prefixo /api). Envelope de resposta:
+// { code, message, error_code, data, status }. O token vem em `data` no login.
+// Deixe MOCK_AUTH = true para voltar aos dados mockados.
 
-const MOCK_AUTH = true;
+const MOCK_AUTH = false;
 
 export type UserType = "user" | "company";
 
@@ -36,24 +37,46 @@ export interface CompanySignupData {
     zip_code: string;
 }
 
+const TOKEN_KEY = "reservae_token";
+
+export function getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
+}
+
+export function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
+}
+
+interface Envelope<T> {
+    code: number;
+    message: string;
+    error_code?: string | null;
+    data: T;
+}
+
+async function postJson<T>(url: string, body: unknown, fallbackError: string): Promise<Envelope<T>> {
+    const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+        throw new Error(json?.message || fallbackError);
+    }
+    return json as Envelope<T>;
+}
+
 export async function login(data: LoginData) {
     if (MOCK_AUTH) {
         await new Promise((resolve) => setTimeout(resolve, 1200));
         return { token: "mock-token", user: { name: "João Silva", email: data.email } };
     }
 
-    const res = await fetch("/api/auth/user-login", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-        throw new Error("Erro ao fazer o login");
-    }
-
-    return res.json();
+    const json = await postJson<string>("/api/auth/user-login", data, "Erro ao fazer o login");
+    if (json.data) localStorage.setItem(TOKEN_KEY, json.data);
+    return json;
 }
 
 export async function loginCompany(data: CompanyLoginData) {
@@ -62,18 +85,9 @@ export async function loginCompany(data: CompanyLoginData) {
         return { token: "mock-token", company: { name: "Arena Beira-Mar", cnpj: data.cnpj } };
     }
 
-    const res = await fetch("/api/auth/company-login", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-        throw new Error("Erro ao fazer o login");
-    }
-
-    return res.json();
+    const json = await postJson<string>("/api/auth/company-login", data, "Erro ao fazer o login");
+    if (json.data) localStorage.setItem(TOKEN_KEY, json.data);
+    return json;
 }
 
 export async function signup(data: SignupData) {
@@ -82,18 +96,8 @@ export async function signup(data: SignupData) {
         return { token: "mock-token", user: { name: data.name, email: data.email } };
     }
 
-    const res = await fetch("/api/auth/user-signup", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-        throw new Error("Erro ao criar a conta");
-    }
-
-    return res.json();
+    // Cadastro de jogador → POST /api/users (UserCreateDTO)
+    return postJson<unknown>("/api/users", data, "Erro ao criar a conta");
 }
 
 export async function signupCompany(data: CompanySignupData) {
@@ -102,16 +106,6 @@ export async function signupCompany(data: CompanySignupData) {
         return { token: "mock-token", company: { name: data.name, email: data.email } };
     }
 
-    const res = await fetch("/api/auth/company-signup", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-        throw new Error("Erro ao criar a conta");
-    }
-
-    return res.json();
+    // Cadastro de empresa → POST /api/companies (CompanyCreateDTO)
+    return postJson<unknown>("/api/companies", data, "Erro ao criar a conta");
 }
