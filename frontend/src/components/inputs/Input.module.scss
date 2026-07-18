@@ -1,0 +1,43 @@
+@use "../../styles/variables" as *;
+
+.wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    border-radius: $border-radius-lg;
+    overflow: hidden;
+    background: var(--bg);
+    border: $border-default;
+}
+
+.icon {
+    position: absolute;
+    left: $spacing-md;
+    display: flex;
+    color: var(--text-sec);
+}
+
+.input {
+    width: 100%;
+    padding: $spacing-md $spacing-lg;
+
+    &.with-icon {
+        padding-left: 48px;
+    }
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: $font-size-sm;
+    color: var(--text);
+
+    &::placeholder {
+        color: var(--text);
+        opacity: 0.4;
+    }
+}
+
+.right {
+    position: absolute;
+    right: $spacing-md;
+    display: flex;
+}

@@ -1,0 +1,217 @@
+@use "./variables" as *;
+
+// ---------- Tema (claro/escuro via CSS custom properties) ----------
+
+:root,
+[data-theme="light"] {
+    --bg: #F5EFE4;
+    --bg-secondary: #E8D7BD;
+    --card: #FFFFFF;
+    --primary: #AD9900;
+    --accent: #FFD482;
+    --cta: #AD9900;
+    --text: #211C17;
+    --text-sec: #6B6258;
+    --success: #2FAFA0;
+    --border: rgba(33, 28, 23, 0.08);
+    --shadow-tint: rgba(33, 28, 23, 0.05);
+}
+
+[data-theme="dark"] {
+    --bg: #16120D;
+    --bg-secondary: #1F1A12;
+    --card: #261F15;
+    --primary: #C4AE00;
+    --accent: #FFD482;
+    --cta: #C4AE00;
+    --text: #F5EFE4;
+    --text-sec: #9E8E7A;
+    --success: #2FAFA0;
+    --border: rgba(245, 239, 228, 0.08);
+    --shadow-tint: rgba(0, 0, 0, 0.3);
+}
+
+body {
+    margin: 0;
+    font-family: $font-body;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--bg);
+    color: var(--text);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+}
+
+input {
+    font-family: inherit;
+}
+
+// ---------- Layout ----------
+
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flex-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.full-height {
+    min-height: 100vh;
+}
+
+.gap-sm {
+    gap: $spacing-sm;
+}
+
+.gap-md {
+    gap: $spacing-md;
+}
+
+.scrollbar-none {
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+// ---------- Componentes ----------
+
+.card {
+    border: $border-default;
+    border-radius: $border-radius;
+    padding: $spacing-lg;
+    background-color: var(--card);
+}
+
+// Cartão padrão do design (superfícies arredondadas)
+.surface-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: $border-radius-lg;
+    box-shadow: 0 2px 8px var(--shadow-tint);
+}
+
+.title {
+    font-size: $font-size-lg;
+    font-weight: bold;
+    color: $color-primary;
+}
+
+// Título de seção
+.section-title {
+    font-family: $font-display;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    margin: 0;
+}
+
+.text-sec {
+    color: var(--text-sec);
+}
+
+.input {
+    padding: $spacing-sm;
+    border: $border-default;
+    border-radius: $border-radius;
+    font-size: $font-size-md;
+    outline: none;
+
+    &:focus {
+        border-color: $color-primary;
+    }
+}
+
+.btn {
+    padding: $spacing-sm $spacing-md;
+    border: $border-default;
+    border-radius: $border-radius;
+    font-size: $font-size-md;
+    font-weight: bold;
+    cursor: pointer;
+    background-color: $color-dark;
+    color: $color-primary;
+    transition: opacity 0.2s;
+
+    &:hover {
+        opacity: 0.85;
+    }
+}
+
+.button-primary {
+    color: #FFF;
+    width: 100%;
+    border: none;
+    border-radius: $border-radius-md;
+    padding: 14px 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    background-color: var(--cta);
+    box-shadow: 0 6px 20px rgba(173, 153, 0, 0.28);
+    transition: transform 0.15s, opacity 0.2s;
+
+    &:active {
+        transform: scale(0.97);
+    }
+
+    &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+}
+
+.button-secondary {
+    background: var(--card);
+    color: var(--primary);
+    border: $border-default;
+    border-radius: $border-radius-md;
+    padding: $spacing-sm $spacing-lg;
+    font-size: $font-size-sm;
+    font-weight: 700;
+}
+
+// Caixa de ícone (quadradinho tintado do design)
+.icon-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: rgba(173, 153, 0, 0.1);
+    color: var(--primary);
+    flex-shrink: 0;
+
+    svg {
+        width: 17px;
+        height: 17px;
+    }
+}
+
+// Chip / tag arredondada
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: $font-size-xs;
+    font-weight: 600;
+    background: var(--bg-secondary);
+    color: var(--text-sec);
+}

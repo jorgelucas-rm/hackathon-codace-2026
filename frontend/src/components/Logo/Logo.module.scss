@@ -1,0 +1,24 @@
+@use "../../styles/variables" as *;
+
+.logo {
+    font-family: $font-logo;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+.logo-sm {
+    font-size: 20px;
+}
+
+.logo-md {
+    font-size: 24px;
+}
+
+.logo-lg {
+    font-size: 36px;
+}
+
+.highlight {
+    color: var(--primary);
+}

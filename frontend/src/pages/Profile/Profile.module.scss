@@ -1,0 +1,253 @@
+@use "../../styles/variables" as *;
+
+// ============================================================
+//  Perfil — reorganizado por hierarquia (identidade → stats →
+//  menu → ação destrutiva). Coeso com o sistema visual da app.
+// ============================================================
+
+.container {
+    min-height: 100vh;
+    padding-bottom: 96px;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.inner {
+    max-width: 960px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 $spacing-lg;
+}
+
+.eyebrow {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--primary);
+}
+
+// ---------- Header ----------
+
+.header {
+    padding: 28px 0 8px;
+    background: linear-gradient(165deg, var(--bg-secondary) 0%, var(--bg) 82%);
+}
+
+// ---------- Grid geral ----------
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding-top: 16px;
+
+    @media (min-width: 900px) {
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+
+        .identity-card { grid-column: 1 / -1; }
+        .stats { grid-column: 1; grid-row: 2; }
+        .menu-card { grid-column: 2; grid-row: 2 / span 2; }
+        .logout-wrap { grid-column: 1; grid-row: 3; }
+    }
+}
+
+// ---------- Identidade (principal) ----------
+
+.identity-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 20px;
+    border-radius: $border-radius-xl;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 6px 22px var(--shadow-tint);
+}
+
+.avatar {
+    width: 72px;
+    height: 72px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(173, 153, 0, 0.1);
+    border: 2px solid var(--accent);
+    color: var(--primary);
+}
+
+.identity-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.name {
+    margin: 0;
+    font-family: $font-display;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+.identity-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.level {
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: rgba(173, 153, 0, 0.12);
+    color: var(--primary);
+}
+
+.place {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12.5px;
+    color: var(--text-sec);
+
+    svg { color: var(--primary); }
+}
+
+.edit-btn {
+    flex-shrink: 0;
+    margin-left: auto;
+
+    @media (max-width: 520px) {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
+// ---------- Estatísticas (secundário) ----------
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+
+    @media (min-width: 560px) {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    @media (min-width: 900px) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.stat {
+    padding: 16px 10px;
+    text-align: center;
+    border-radius: $border-radius-lg;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px var(--shadow-tint);
+
+    p {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        color: var(--primary);
+    }
+
+    span {
+        display: block;
+        margin-top: 3px;
+        font-size: 12px;
+        color: var(--text-sec);
+    }
+}
+
+// ---------- Menu / navegação ----------
+
+.menu-card {
+    overflow: hidden;
+    border-radius: $border-radius-xl;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 12px var(--shadow-tint);
+}
+
+.menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 15px 16px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.18s;
+
+    &:last-child { border-bottom: none; }
+    &:hover { background: var(--bg-secondary); }
+}
+
+.menu-text {
+    flex: 1;
+    min-width: 0;
+
+    p {
+        margin: 0;
+        font-size: 14.5px;
+        font-weight: 700;
+        color: var(--text);
+    }
+
+    span {
+        display: block;
+        margin-top: 2px;
+        font-size: 12.5px;
+        color: var(--text-sec);
+    }
+}
+
+.menu-chevron {
+    flex-shrink: 0;
+    color: var(--text-sec);
+    opacity: 0.7;
+}
+
+// ---------- Ação destrutiva (subordinada) ----------
+
+.logout-wrap {
+    display: flex;
+    justify-content: center;
+}
+
+.logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 13px;
+    border-radius: $border-radius-md;
+    background: transparent;
+    border: 1px solid #FCA5A5;
+    color: $color-danger;
+    font-size: 14px;
+    font-weight: 700;
+    transition: background 0.18s;
+
+    &:hover { background: #FEE2E2; }
+
+    @media (min-width: 900px) {
+        max-width: 100%;
+    }
+}
