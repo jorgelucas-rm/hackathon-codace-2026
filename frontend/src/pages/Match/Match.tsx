@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, Loader2, CircleDot, Activity, Volleyball, Waves, Dumbbell, CalendarClock, Users } from "lucide-react";
 import { Screen } from "../../types";
 import { BookingRead, formatHHMM, formatPriceCents } from "../../services/booking.service";
@@ -73,9 +74,16 @@ function formatShortDate(date: string): string {
 }
 
 export function Match({ onNavigate }: MatchProps) {
-    const [apptTab, setApptTab] = useState<ApptTab>("proximos");
-    const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
-    const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialBookingId = searchParams.get("bookingId");
+    const initialGroupId = searchParams.get("groupId");
+    const [apptTab, setApptTab] = useState<ApptTab>(initialGroupId ? "grupos" : "proximos");
+    const [selectedBookingId, setSelectedBookingId] = useState<number | null>(
+        initialBookingId ? Number(initialBookingId) : null
+    );
+    const [selectedGroupId, setSelectedGroupId] = useState<number | null>(
+        initialGroupId ? Number(initialGroupId) : null
+    );
 
     const upcoming = useMyBookings("upcoming");
     const history = useMyBookings("history");
@@ -149,6 +157,7 @@ export function Match({ onNavigate }: MatchProps) {
                                         <span className={styles["appt-icon"]}><Users width={20} height={20} /></span>
                                         <div className={styles["appt-info"]}>
                                             <p className={styles["appt-name"]}>{g.court_name ?? "Partida em grupo"}</p>
+                                            {g.company_name && <p className={styles["appt-place"]}>{g.company_name}</p>}
                                             <p className={styles["appt-sub"]}>
                                                 {formatShortDate(g.date)} · {formatHHMM(g.start_time)} · {g.filled_spots}/{g.total_spots} vagas · {formatPriceCents(g.spot_price)}
                                             </p>
@@ -176,6 +185,7 @@ export function Match({ onNavigate }: MatchProps) {
                                         <span className={styles["appt-icon"]}><Icon width={20} height={20} /></span>
                                         <div className={styles["appt-info"]}>
                                             <p className={styles["appt-name"]}>{b.court_name ?? "Reserva"}</p>
+                                            {b.company_name && <p className={styles["appt-place"]}>{b.company_name}</p>}
                                             <p className={styles["appt-sub"]}>
                                                 {formatShortDate(b.date)} · {formatHHMM(b.start_time)} · {formatPriceCents(b.type === "GROUP" ? b.group?.spot_price ?? b.total_price : b.total_price)}
                                             </p>
@@ -191,7 +201,13 @@ export function Match({ onNavigate }: MatchProps) {
                 </section>
             </main>
 
-            <BookingDetailModal bookingId={selectedBookingId} onClose={() => setSelectedBookingId(null)} />
+            <BookingDetailModal
+                bookingId={selectedBookingId}
+                onClose={() => {
+                    setSelectedBookingId(null);
+                    if (searchParams.has("bookingId")) setSearchParams((p) => { p.delete("bookingId"); return p; });
+                }}
+            />
             <JoinGroupModal
                 groupId={selectedGroupId}
                 mode="manage"

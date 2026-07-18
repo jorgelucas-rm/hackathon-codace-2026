@@ -1,0 +1,17 @@
+@use "../../styles/variables" as *;
+
+.bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 0;
+    background: #261F15;
+}
+
+.logo {
+    color: #fff !important;
+
+    span {
+        color: $color-accent !important;
+    }
+}

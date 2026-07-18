@@ -13,6 +13,7 @@
 //   POST /api/groups/{id}/join                -> entrar num grupo aberto (auth USER)
 //   GET  /api/payments/{id}                   -> detalhe do pagamento (auth USER)
 //   POST /api/payments/{id}/confirm           -> simulador de gateway (auth USER)
+//   POST /api/bookings/{id}/reviews           -> avalia uma reserva concluída (auth USER)
 
 import { getToken } from "./auth.service";
 import { Sport } from "./companies.service";
@@ -158,6 +159,23 @@ export interface GroupLeaveResponse {
     refunded: boolean;
 }
 
+export interface BookingCancelResponse {
+    booking: BookingRead;
+    refunded: boolean;
+}
+
+export interface ReviewRead {
+    id: number;
+    company_id: number;
+    booking_id: number;
+    user_id: number;
+    user_name: string | null;
+    rating: number;
+    comment: string | null;
+    helpful_count: number;
+    created_at: string;
+}
+
 interface Envelope<T> {
     code: number;
     message: string;
@@ -225,6 +243,42 @@ export async function createClosedBooking(
     return json.data;
 }
 
+export interface GroupBookingConfig {
+    totalSpots: number;
+    minSpots: number;
+    visibility: "public" | "link";
+    closingDeadline: string;
+    leftoverRule: "creator_absorbs" | "recalculate_quota";
+}
+
+export async function createGroupBooking(
+    courtId: number,
+    date: string,
+    startTime: string,
+    endTime: string,
+    group: GroupBookingConfig
+): Promise<BookingCreateResponse> {
+    const json = await postJsonAuth<BookingCreateResponse>(
+        "/api/bookings",
+        {
+            court_id: courtId,
+            date,
+            start_time: startTime,
+            end_time: endTime,
+            type: "group",
+            group: {
+                total_spots: group.totalSpots,
+                min_spots: group.minSpots,
+                visibility: group.visibility,
+                closing_deadline: group.closingDeadline,
+                leftover_rule: group.leftoverRule,
+            },
+        },
+        "Erro ao criar o grupo aberto"
+    );
+    return json.data;
+}
+
 export async function getBooking(bookingId: number): Promise<BookingRead> {
     const json = await getJson<BookingRead>(`/api/bookings/${bookingId}`, "Erro ao buscar a reserva", true);
     return json.data;
@@ -269,6 +323,15 @@ export async function joinGroup(groupId: number): Promise<GroupJoinResponse> {
     return json.data;
 }
 
+export async function cancelBooking(bookingId: number): Promise<BookingCancelResponse> {
+    const json = await postJsonAuth<BookingCancelResponse>(
+        `/api/bookings/${bookingId}/cancel`,
+        {},
+        "Erro ao cancelar a reserva"
+    );
+    return json.data;
+}
+
 export async function getMyGroups(): Promise<GroupDetail[]> {
     const json = await getJson<GroupDetail[]>("/api/groups/mine", "Erro ao buscar seus grupos", true);
     return json.data;
@@ -297,6 +360,19 @@ export async function confirmPayment(
         `/api/payments/${paymentId}/confirm`,
         { result, method },
         "Erro ao confirmar o pagamento"
+    );
+    return json.data;
+}
+
+export async function createReview(
+    bookingId: number,
+    rating: number,
+    comment: string | null
+): Promise<ReviewRead> {
+    const json = await postJsonAuth<ReviewRead>(
+        `/api/bookings/${bookingId}/reviews`,
+        { rating, comment: comment || null },
+        "Erro ao enviar a avaliação"
     );
     return json.data;
 }

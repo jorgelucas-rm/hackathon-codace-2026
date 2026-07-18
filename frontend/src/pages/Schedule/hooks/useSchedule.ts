@@ -2,11 +2,15 @@ import { UseMutationResult, UseQueryResult, useMutation, useQuery } from "@tanst
 import {
     AvailabilityResponse,
     BookingCreateResponse,
+    GroupBookingConfig,
     createClosedBooking,
+    createGroupBooking,
     getAvailability,
 } from "../../../services/booking.service";
 
 export { useCourt } from "../../../hooks/useCourt";
+// Reaproveitado para o seletor "trocar de quadra" — mesma company, outras quadras.
+export { useCompanyDetail } from "../../CourtDetail/hooks/useCourtDetail";
 
 // Anotação de retorno explícita + cast — mesma razão de `hooks/useCompanies.ts`:
 // nesta combinação de TypeScript/@tanstack-react-query, o generic sozinho em
@@ -32,5 +36,20 @@ export function useCreateBooking(): UseMutationResult<
         BookingCreateResponse,
         Error,
         { courtId: number; date: string; startTime: string; endTime: string }
+    >;
+}
+
+export function useCreateGroupBooking(): UseMutationResult<
+    BookingCreateResponse,
+    Error,
+    { courtId: number; date: string; startTime: string; endTime: string; group: GroupBookingConfig }
+> {
+    return useMutation({
+        mutationFn: ({ courtId, date, startTime, endTime, group }) =>
+            createGroupBooking(courtId, date, startTime, endTime, group),
+    }) as UseMutationResult<
+        BookingCreateResponse,
+        Error,
+        { courtId: number; date: string; startTime: string; endTime: string; group: GroupBookingConfig }
     >;
 }

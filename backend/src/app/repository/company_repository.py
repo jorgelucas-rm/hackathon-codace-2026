@@ -1,5 +1,7 @@
 from typing import Optional, Type
 
+from sqlalchemy.orm import selectinload
+
 from src.app.model.entity.company import Company
 from src.app.model.entity.court import Court, court_sport
 from src.app.model.enum.court_status import CourtStatus
@@ -26,7 +28,11 @@ class CompanyRepository(BaseRepository[Company]):
         `court`/`court_sport` (não JSON). Distância/raio/comodidades são
         filtrados em memória pelo service (Haversine em Python puro).
         """
-        query = self.session.query(Company).filter(Company.situation.is_(True))
+        query = (
+            self.session.query(Company)
+            .options(selectinload(Company.courts).selectinload(Court.sports))
+            .filter(Company.situation.is_(True))
+        )
 
         if sport_id is not None:
             # Subquery (IN), não DISTINCT: Company tem colunas JSON (photos/

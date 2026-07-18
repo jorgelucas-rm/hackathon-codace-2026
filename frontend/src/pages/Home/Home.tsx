@@ -8,14 +8,25 @@ import { formatPriceCents } from "../../services/companies.service";
 import { formatHHMM, formatPriceCents as formatCents } from "../../services/booking.service";
 import { useMe } from "../../hooks/useMe";
 import { useCompanySearch, useSports } from "../../hooks/useCompanies";
-import { useOpenGroups } from "../../hooks/useGroups";
+import { useMyGroups, useOpenGroups } from "../../hooks/useGroups";
+import { useMyBookings } from "../Match/hooks/useBookings";
 import { getSportIcon } from "../../components/icons/SportIcons";
 import { JoinGroupModal } from "../../components/JoinGroupModal/JoinGroupModal";
+import { AnimatedSearchInput } from "../../components/AnimatedSearchInput/AnimatedSearchInput";
 import styles from "./Home.module.scss";
 
 function formatMatchDate(date: string): string {
     const [y, m, d] = date.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+function formatNextMatchDate(date: string): string {
+    const [y, m, d] = date.split("-").map(Number);
+    const target = new Date(y, m - 1, d);
+    const today = new Date();
+    return target.toDateString() === today.toDateString()
+        ? "Hoje"
+        : target.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
 interface HomeProps {
@@ -24,11 +35,18 @@ interface HomeProps {
     onSelectSport: (sportId: number) => void;
     onSearch: (term: string) => void;
     onGroupJoined: (paymentId: number) => void;
+    onOpenAppointment: (kind: "booking" | "group", id: number) => void;
     dark: boolean;
     toggleDark: () => void;
 }
 
-export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, onGroupJoined, dark, toggleDark }: HomeProps) {
+const ACTIVE_GROUP_STATUSES = new Set(["OPEN", "FULL", "CONFIRMED"]);
+
+function dateTimeKey(date: string, time: string): string {
+    return `${date}T${time}`;
+}
+
+export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, onGroupJoined, onOpenAppointment, dark, toggleDark }: HomeProps) {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
     const { data: sports } = useSports();
@@ -38,6 +56,23 @@ export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, onGro
     const matches = (openGroups ?? []).slice(0, 4);
     const { data: me } = useMe();
     const firstName = me?.entity?.name?.split(" ")[0] ?? "";
+    const { data: upcomingBookings } = useMyBookings("upcoming");
+    const { data: myGroups } = useMyGroups();
+
+    // "Próxima partida" cobre tanto reservas próprias quanto grupos em que o
+    // usuário só entrou como membro (não aparecem em `useMyBookings` — a API
+    // de reservas só lista quem criou a reserva) — pega a mais próxima dos dois.
+    const nextBooking = upcomingBookings?.[0] ?? null;
+    const nextGroup = (myGroups ?? [])
+        .filter((g) => ACTIVE_GROUP_STATUSES.has(g.status))
+        .sort((a, b) => dateTimeKey(a.date, a.start_time).localeCompare(dateTimeKey(b.date, b.start_time)))[0] ?? null;
+
+    const nextAppointment = !nextBooking ? (nextGroup && { kind: "group" as const, data: nextGroup })
+        : !nextGroup ? { kind: "booking" as const, data: nextBooking }
+        : dateTimeKey(nextBooking.date, nextBooking.start_time) <= dateTimeKey(nextGroup.date, nextGroup.start_time)
+            ? { kind: "booking" as const, data: nextBooking }
+            : { kind: "group" as const, data: nextGroup };
+    const avatarUrl = me?.entity?.avatar;
 
     return (
         <div className={styles["container"]}>
@@ -55,7 +90,7 @@ export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, onGro
                                 {dark ? <Sun width={18} height={18} /> : <Moon width={18} height={18} />}
                             </button>
                             <button onClick={() => onNavigate("profile")} className={styles["avatar"]} aria-label="Perfil">
-                                <User width={20} height={20} />
+                                {avatarUrl ? <img src={avatarUrl} alt="Perfil" /> : <User width={20} height={20} />}
                             </button>
                         </div>
                     </div>
@@ -65,10 +100,9 @@ export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, onGro
                         onSubmit={(e) => { e.preventDefault(); onSearch(searchTerm); }}
                     >
                         <Search width={20} height={20} />
-                        <input
+                        <AnimatedSearchInput
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Buscar quadras, esportes ou locais..."
                         />
                         <button type="submit" className={styles["search-btn"]} aria-label="Filtrar">
                             <SlidersHorizontal width={18} height={18} />
@@ -79,17 +113,30 @@ export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, onGro
 
             <main className={styles["inner"]}>
                 {/* ---------- Próxima partida (ação prioritária) ---------- */}
-                <section className={styles["next-wrap"]}>
-                    <div className={styles["next-card"]} onClick={() => onNavigate("schedule")}>
-                        <div className={styles["next-icon"]}><Calendar width={22} height={22} /></div>
-                        <div className={styles["next-info"]}>
-                            <span className={styles["eyebrow"]}>Sua próxima partida</span>
-                            <p className={styles["next-title"]}>Hoje, 20:00 · Futebol Society</p>
-                            <p className={styles["next-sub"]}><MapPin width={13} height={13} /> Arena Prime Futebol · Aldeota</p>
+                {nextAppointment && (
+                    <section className={styles["next-wrap"]}>
+                        <div
+                            className={styles["next-card"]}
+                            onClick={() => onOpenAppointment(nextAppointment.kind, nextAppointment.data.id)}
+                        >
+                            <div className={styles["next-icon"]}><Calendar width={22} height={22} /></div>
+                            <div className={styles["next-info"]}>
+                                <span className={styles["eyebrow"]}>Sua próxima partida</span>
+                                <p className={styles["next-title"]}>
+                                    {formatNextMatchDate(nextAppointment.data.date)}, {formatHHMM(nextAppointment.data.start_time)}
+                                    {" · "}
+                                    {nextAppointment.kind === "booking"
+                                        ? nextAppointment.data.sport_names[0] ?? nextAppointment.data.court_name ?? "Partida"
+                                        : nextAppointment.data.court_name ?? "Partida"}
+                                </p>
+                                <p className={styles["next-sub"]}>
+                                    <MapPin width={13} height={13} /> {[nextAppointment.data.court_name, nextAppointment.data.company_name].filter(Boolean).join(" · ")}
+                                </p>
+                            </div>
+                            <button className={styles["next-cta"]}>Ver <ArrowRight width={16} height={16} /></button>
                         </div>
-                        <button className={styles["next-cta"]}>Ver <ArrowRight width={16} height={16} /></button>
-                    </div>
-                </section>
+                    </section>
+                )}
 
                 {/* ---------- Esportes ---------- */}
                 <section className={styles["section"]}>
@@ -190,8 +237,24 @@ export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, onGro
                                             {company.nota_media !== null ? company.nota_media.toFixed(1) : "novo"}
                                         </span>
                                     </div>
+                                    <p className={styles["court-place"]}>
+                                        <MapPin width={12} height={12} /> {[company.neighborhood, company.city].filter(Boolean).join(", ")}
+                                    </p>
+                                    {company.sports.length > 0 && (
+                                        <div className={styles["court-tags"]}>
+                                            {company.sports.map((sport) => (
+                                                <span key={sport.id} className={styles["tag"]}>
+                                                    {getSportIcon(sport.name, { width: 12, height: 12 })}
+                                                    {sport.name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                     <div className={styles["court-foot"]}>
-                                        <span className={styles["price"]}>{formatPriceCents(company.min_price_hour)}{company.min_price_hour !== null ? "/h" : ""}</span>
+                                        <div className={styles["price-block"]}>
+                                            <span className={styles["price-eyebrow"]}>A partir de</span>
+                                            <span className={styles["price"]}>{formatPriceCents(company.min_price_hour)}{company.min_price_hour !== null ? "/h" : ""}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </article>

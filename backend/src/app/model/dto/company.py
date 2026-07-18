@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from src.app.model.dto.court import CourtReadDTO
+from src.app.model.dto.sport import SportReadDTO
 from src.app.model.dto.validators import CnpjStr, PasswordStr
 
 
@@ -90,6 +91,9 @@ class CompanySearchCardDTO(BaseModel):
     distance_km: Optional[float] = None
     min_price_hour: Optional[int] = None
     nota_media: Optional[float] = None
+    neighborhood: str
+    city: str
+    sports: list[SportReadDTO] = Field(default_factory=list)
 
 
 class CompanyDetailDTO(CompanyReadDTO):

@@ -14,6 +14,7 @@ from src.app.model.dto.company import (
 )
 from src.app.model.dto.court import CourtReadDTO
 from src.app.model.dto.pagination import Pagination
+from src.app.model.dto.sport import SportReadDTO
 from src.app.model.entity.company import Company
 from src.app.model.entity.court import Court
 from src.app.model.enum import ErrorCode
@@ -159,6 +160,9 @@ class CompanyService:
         cover_photo = resolve_single_photo_url(
             self.minio_adapter, company.photos[0] if company.photos else None
         )
+        sports_by_id = {
+            sport.id: sport for court in active_courts for sport in court.sports
+        }
         return CompanySearchCardDTO(
             id=company.id,
             name=company.name,
@@ -166,6 +170,12 @@ class CompanyService:
             distance_km=round(distance_km, 2) if distance_km is not None else None,
             min_price_hour=min_price_hour,
             nota_media=self._nota_media(company.id),
+            neighborhood=company.neighborhood,
+            city=company.city,
+            sports=[
+                SportReadDTO.model_validate(s)
+                for s in sorted(sports_by_id.values(), key=lambda s: s.name)
+            ],
         )
 
     def search_public(

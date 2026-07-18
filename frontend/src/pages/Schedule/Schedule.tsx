@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
-import { ChevronLeft, MapPin, Calendar, Clock, Shield, Users, CheckCircle, Sunrise, Sun, Moon, Trophy, Timer, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ChevronLeft, MapPin, Calendar, Clock, Shield, Users, CheckCircle, Sunrise, Sun, Moon, Trophy, Timer, Loader2, Minus, Plus, Repeat } from "lucide-react";
 import { Screen } from "../../types";
 import { AvailabilitySlot, formatHHMM, formatPriceCents } from "../../services/booking.service";
-import { useAvailability, useCourt, useCreateBooking } from "./hooks/useSchedule";
+import { useAvailability, useCompanyDetail, useCourt, useCreateBooking, useCreateGroupBooking } from "./hooks/useSchedule";
 import styles from "./Schedule.module.scss";
+
+const MIN_GROUP_SPOTS = 2;
 
 interface ScheduleProps {
     courtId: number | null;
@@ -41,25 +44,46 @@ function buildDays(count: number) {
 }
 
 export function Schedule({ courtId, onNavigate, onBookingCreated }: ScheduleProps) {
+    const navigate = useNavigate();
     const days = useMemo(() => buildDays(7), []);
     const [selectedDay, setSelectedDay] = useState(0);
     const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
     const [reservationType, setReservationType] = useState<"private" | "group">("private");
+    const [groupSpots, setGroupSpots] = useState(MIN_GROUP_SPOTS);
     const [bookingError, setBookingError] = useState<string | null>(null);
 
     const selectedDate = days[selectedDay].iso;
 
     const { data: court, isLoading: courtLoading } = useCourt(courtId);
+    const { data: company } = useCompanyDetail(court?.company.id ?? 0);
     const { data: availability, isLoading: availabilityLoading, isError: availabilityError } = useAvailability(courtId, selectedDate);
     const createBooking = useCreateBooking();
+    const createGroupBooking = useCreateGroupBooking();
+
+    const siblingCourts = (company?.courts ?? []).filter((c) => c.status === "ACTIVE");
+    const maxGroupSpots = Math.max(MIN_GROUP_SPOTS, court?.capacity ?? MIN_GROUP_SPOTS);
+
+    // Sempre que a quadra muda (ou a capacidade fica menor que o valor
+    // escolhido), reancora o seletor de vagas num valor válido.
+    useEffect(() => {
+        setGroupSpots((prev) => Math.min(Math.max(prev, MIN_GROUP_SPOTS), maxGroupSpots));
+    }, [maxGroupSpots]);
+
+    function handleSwitchCourt(newCourtId: number) {
+        if (newCourtId === courtId) return;
+        setSelectedSlot(null);
+        setBookingError(null);
+        navigate(`/schedule/${newCourtId}`);
+    }
 
     const slotsByPeriod: Record<keyof typeof PERIODS, AvailabilitySlot[]> = { manha: [], tarde: [], noite: [] };
     for (const slot of availability?.slots ?? []) {
         slotsByPeriod[periodOf(slot.start_time)].push(slot);
     }
 
-    const price = selectedSlot ? formatPriceCents(selectedSlot.price) : "—";
-    const total = price;
+    const total = selectedSlot ? formatPriceCents(selectedSlot.price) : "—";
+    const spotPrice = selectedSlot ? formatPriceCents(Math.ceil(selectedSlot.price / groupSpots)) : "—";
+    const price = reservationType === "group" ? spotPrice : total;
 
     const slotClass = (slot: AvailabilitySlot, isSelected: boolean) => {
         if (isSelected) return styles["slot-selected"];
@@ -78,9 +102,48 @@ export function Schedule({ courtId, onNavigate, onBookingCreated }: ScheduleProp
         setSelectedSlot((prev) => (prev?.start_time === slot.start_time ? null : slot));
     }
 
+    // Prazo de fechamento do grupo: 2h antes do jogo, sem nunca cair antes de
+    // "agora" nem depois do início da partida (regra validada no backend).
+    function computeClosingDeadline(date: string, startTime: string): string {
+        // O backend interpreta `date`+`start_time` como UTC
+        // (`datetime.combine(..., tzinfo=timezone.utc)` em group_service.py) —
+        // por isso o "Z" aqui, para não introduzir um offset pelo fuso local
+        // do navegador e acabar mandando um closing_deadline depois do
+        // game_start que o backend calcula (o que rejeita com 422/INVALID_GROUP_CONFIG).
+        const gameStart = new Date(`${date}T${startTime}Z`);
+        const twoHoursBefore = new Date(gameStart.getTime() - 2 * 60 * 60 * 1000);
+        const soon = new Date(Date.now() + 15 * 60 * 1000);
+        const deadline = twoHoursBefore.getTime() > soon.getTime() ? twoHoursBefore : soon;
+        return (deadline.getTime() < gameStart.getTime() ? deadline : new Date(gameStart.getTime() - 5 * 60 * 1000)).toISOString();
+    }
+
     function handleContinue() {
-        if (!selectedSlot || !courtId || reservationType === "group") return;
+        if (!selectedSlot || !courtId) return;
         setBookingError(null);
+
+        if (reservationType === "group") {
+            createGroupBooking.mutate(
+                {
+                    courtId,
+                    date: selectedDate,
+                    startTime: selectedSlot.start_time,
+                    endTime: selectedSlot.end_time,
+                    group: {
+                        totalSpots: groupSpots,
+                        minSpots: Math.min(MIN_GROUP_SPOTS, groupSpots),
+                        visibility: "public",
+                        closingDeadline: computeClosingDeadline(selectedDate, selectedSlot.start_time),
+                        leftoverRule: "creator_absorbs",
+                    },
+                },
+                {
+                    onSuccess: (result) => onBookingCreated(result.payment.id),
+                    onError: (err) => setBookingError(err.message),
+                }
+            );
+            return;
+        }
+
         createBooking.mutate(
             {
                 courtId,
@@ -95,7 +158,10 @@ export function Schedule({ courtId, onNavigate, onBookingCreated }: ScheduleProp
         );
     }
 
-    const canContinue = !!selectedSlot && !!courtId && reservationType === "private" && !createBooking.isPending;
+    const isSubmitting = createBooking.isPending || createGroupBooking.isPending;
+    const canContinue = !!selectedSlot && !!courtId
+        && (reservationType === "private" || (reservationType === "group" && groupSpots >= MIN_GROUP_SPOTS))
+        && !isSubmitting;
 
     if (!courtId) {
         return (
@@ -139,6 +205,25 @@ export function Schedule({ courtId, onNavigate, onBookingCreated }: ScheduleProp
                         </div>
                     </div>
 
+                    {/* ---------- Trocar quadra (mesma arena) ---------- */}
+                    {siblingCourts.length > 1 && (
+                        <section className={styles["block"]}>
+                            <p className={styles["block-label"]}><Repeat width={14} height={14} /> Trocar de quadra</p>
+                            <div className={`scrollbar-none ${styles["courts-switch"]}`}>
+                                {siblingCourts.map((c) => (
+                                    <button
+                                        key={c.id}
+                                        onClick={() => handleSwitchCourt(c.id)}
+                                        className={`${styles["court-chip"]} ${c.id === courtId ? styles["court-chip-active"] : ""}`}
+                                    >
+                                        <strong>{c.name}</strong>
+                                        <span>{formatPriceCents(c.base_price_hour)}/h</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
                     {/* ---------- Data ---------- */}
                     <section className={styles["block"]}>
                         <p className={styles["block-label"]}>Escolha o dia</p>
@@ -173,7 +258,36 @@ export function Schedule({ courtId, onNavigate, onBookingCreated }: ScheduleProp
                             ))}
                         </div>
                         {reservationType === "group" && (
-                            <p className={styles["block-label"]}>Grupo aberto em breve por aqui — reserve como privada por enquanto.</p>
+                            <div className={styles["group-config"]}>
+                                <p className={styles["group-config-label"]}>Quantas vagas o grupo vai ter?</p>
+                                <div className={styles["spots-stepper"]}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setGroupSpots((n) => Math.max(MIN_GROUP_SPOTS, n - 1))}
+                                        disabled={groupSpots <= MIN_GROUP_SPOTS}
+                                        className={styles["spot-btn"]}
+                                        aria-label="Diminuir vagas"
+                                    >
+                                        <Minus width={16} height={16} />
+                                    </button>
+                                    <div className={styles["spot-value"]}>
+                                        <strong>{groupSpots}</strong>
+                                        <span>vagas</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setGroupSpots((n) => Math.min(maxGroupSpots, n + 1))}
+                                        disabled={groupSpots >= maxGroupSpots}
+                                        className={styles["spot-btn"]}
+                                        aria-label="Aumentar vagas"
+                                    >
+                                        <Plus width={16} height={16} />
+                                    </button>
+                                </div>
+                                <p className={styles["group-config-hint"]}>
+                                    Máximo de {maxGroupSpots} vagas (capacidade da quadra). Cada pessoa paga {spotPrice}.
+                                </p>
+                            </div>
                         )}
                     </section>
 
@@ -250,15 +364,21 @@ export function Schedule({ courtId, onNavigate, onBookingCreated }: ScheduleProp
                     <div className={styles["summary-row"]}><span><Calendar width={15} height={15} /> Data</span><strong>{days[selectedDay].label}, {days[selectedDay].date}</strong></div>
                     <div className={styles["summary-row"]}><span><Clock width={15} height={15} /> Horário</span><strong>{selectedSlot ? formatHHMM(selectedSlot.start_time) : "—"}</strong></div>
                     <div className={styles["summary-row"]}><span><Timer width={15} height={15} /> Duração</span><strong>{selectedSlot ? "1h" : "—"}</strong></div>
+                    {reservationType === "group" && (
+                        <div className={styles["summary-row"]}><span><Users width={15} height={15} /> Vagas</span><strong>{groupSpots}</strong></div>
+                    )}
 
                     <div className={styles["summary-divider"]} />
 
-                    <div className={styles["summary-line"]}><span>Valor</span><span>{price}</span></div>
-                    <div className={styles["summary-total"]}><span>Total</span><strong>{total}</strong></div>
+                    <div className={styles["summary-line"]}><span>{reservationType === "group" ? "Valor total do horário" : "Valor"}</span><span>{total}</span></div>
+                    <div className={styles["summary-total"]}>
+                        <span>{reservationType === "group" ? "Sua cota agora" : "Total"}</span>
+                        <strong>{price}</strong>
+                    </div>
                 </div>
                 <div className={styles["summary-foot"]}>
                     <button onClick={handleContinue} disabled={!canContinue} className={styles["cta"]}>
-                        {createBooking.isPending ? "Reservando..." : selectedSlot ? "Continuar reserva" : "Selecione um horário"}
+                        {isSubmitting ? "Enviando..." : !selectedSlot ? "Selecione um horário" : reservationType === "group" ? "Criar grupo aberto" : "Continuar reserva"}
                     </button>
                 </div>
             </aside>
@@ -267,10 +387,10 @@ export function Schedule({ courtId, onNavigate, onBookingCreated }: ScheduleProp
             <div className={styles["mobile-bar"]}>
                 <div className={styles["mobile-info"]}>
                     <span className={styles["mobile-label"]}>{selectedSlot ? `${days[selectedDay].label} · ${formatHHMM(selectedSlot.start_time)}` : "Nenhum horário"}</span>
-                    <strong className={styles["mobile-total"]}>{total}</strong>
+                    <strong className={styles["mobile-total"]}>{price}</strong>
                 </div>
                 <button onClick={handleContinue} disabled={!canContinue} className={styles["cta"]}>
-                    {createBooking.isPending ? "Reservando..." : selectedSlot ? "Continuar" : "Escolher horário"}
+                    {isSubmitting ? "Enviando..." : !selectedSlot ? "Escolher horário" : reservationType === "group" ? "Criar grupo" : "Continuar"}
                 </button>
             </div>
         </div>

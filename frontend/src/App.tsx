@@ -21,6 +21,7 @@ import Checkout from "./pages/Checkout/Checkout";
 import Profile from "./pages/Profile/Profile";
 import Account from "./pages/Account/Account";
 import BottomNav from "./components/BottomNav/BottomNav";
+import BrandBar from "./components/BrandBar/BrandBar";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
@@ -146,6 +147,10 @@ function AppShell() {
         navigate(`/checkout/${paymentId}`);
     }
 
+    function onOpenAppointment(kind: "booking" | "group", id: number) {
+        navigate(kind === "booking" ? `/match?bookingId=${id}` : `/match?groupId=${id}`);
+    }
+
     function onLogin() {
         auth.refresh();
         navigate("/home");
@@ -153,6 +158,7 @@ function AppShell() {
 
     return (
         <div>
+            {showNav && <BrandBar />}
             <Routes>
                 <Route path="/" element={<RootRedirect />} />
                 <Route path="/onboarding" element={<Onboarding onDone={() => navigate("/login")} />} />
@@ -168,6 +174,7 @@ function AppShell() {
                                 onSelectSport={onSelectSport}
                                 onSearch={onSearch}
                                 onGroupJoined={onBookingCreated}
+                                onOpenAppointment={onOpenAppointment}
                                 dark={dark}
                                 toggleDark={toggleDark}
                             />

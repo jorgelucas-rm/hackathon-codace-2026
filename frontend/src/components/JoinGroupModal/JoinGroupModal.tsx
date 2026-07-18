@@ -1,6 +1,8 @@
-import { Calendar, Clock, MapPin, Loader2, Users, X } from "lucide-react";
+import { useState } from "react";
+import { Calendar, Clock, MapPin, Loader2, Users, X, Ban } from "lucide-react";
 import { ApiError, formatHHMM, formatPriceCents } from "../../services/booking.service";
 import { useGroupDetail, useJoinGroup, useLeaveGroup } from "../../hooks/useGroups";
+import { ConfirmModal } from "../ConfirmModal/ConfirmModal";
 import styles from "./JoinGroupModal.module.scss";
 
 interface JoinGroupModalProps {
@@ -41,6 +43,7 @@ export function JoinGroupModal({ groupId, onClose, onJoined, mode = "join" }: Jo
     const { data: group, isLoading, isError } = useGroupDetail(groupId);
     const join = useJoinGroup();
     const leave = useLeaveGroup();
+    const [confirmingLeave, setConfirmingLeave] = useState(false);
 
     if (!groupId) return null;
 
@@ -53,7 +56,7 @@ export function JoinGroupModal({ groupId, onClose, onJoined, mode = "join" }: Jo
 
     function handleLeave() {
         if (!groupId) return;
-        leave.mutate(groupId, { onSuccess: () => onClose() });
+        leave.mutate(groupId, { onSuccess: () => { setConfirmingLeave(false); onClose(); } });
     }
 
     const spotsLeft = group ? Math.max(0, group.total_spots - group.filled_spots) : 0;
@@ -68,6 +71,7 @@ export function JoinGroupModal({ groupId, onClose, onJoined, mode = "join" }: Jo
     const friendlyError = mode === "manage" ? friendlyLeaveError : friendlyJoinError;
 
     return (
+        <>
         <div className={styles["overlay"]} onClick={onClose} role="dialog" aria-modal="true">
             <div className={styles["modal"]} onClick={(e) => e.stopPropagation()}>
                 <button onClick={onClose} className={styles["close"]} aria-label="Fechar">
@@ -154,7 +158,7 @@ export function JoinGroupModal({ groupId, onClose, onJoined, mode = "join" }: Jo
 
                         {mode === "manage" ? (
                             <button
-                                onClick={handleLeave}
+                                onClick={() => setConfirmingLeave(true)}
                                 disabled={leave.isPending}
                                 className={styles["leave-btn"]}
                             >
@@ -173,6 +177,19 @@ export function JoinGroupModal({ groupId, onClose, onJoined, mode = "join" }: Jo
                 )}
             </div>
         </div>
+
+        <ConfirmModal
+            open={confirmingLeave}
+            icon={<Ban width={22} height={22} />}
+            title="Sair do grupo?"
+            message="Você vai perder sua vaga nessa partida. Se ainda houver reembolso disponível, o valor pago será estornado."
+            confirmLabel="Sair do grupo"
+            cancelLabel="Voltar"
+            danger
+            onConfirm={handleLeave}
+            onCancel={() => setConfirmingLeave(false)}
+        />
+        </>
     );
 }
 

@@ -2,14 +2,58 @@ import { useState } from "react";
 import { ChevronLeft, Heart, MapPin, Trophy, Star, ThumbsUp, Car, Wifi, Coffee, Dumbbell, ArrowRight, Loader2 } from "lucide-react";
 import { Screen } from "../../types";
 import { StarRow } from "../../components/StarRow/StarRow";
-import { formatPriceCents } from "../../services/companies.service";
+import { Court, formatPriceCents } from "../../services/companies.service";
 import { useCompanyDetail, useCompanyReviews } from "./hooks/useCourtDetail";
+import { useAvailability } from "../Schedule/hooks/useSchedule";
 import styles from "./CourtDetail.module.scss";
 
 interface CourtDetailProps {
     courtId: number;
     onNavigate: (screen: Screen) => void;
     onSelectSchedule: (courtId: number) => void;
+}
+
+// Quantos chips de horário cabem numa linha do card — o resto (se houver)
+// fica de fora, sempre pegando os primeiros em ordem cronológica.
+const MAX_VISIBLE_SLOTS = 4;
+
+function todayISO(): string {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function formatHourChip(time: string): string {
+    return `${time.slice(0, 2)}h`;
+}
+
+function CourtTile({ court, onSelectSchedule }: { court: Court; onSelectSchedule: (courtId: number) => void }) {
+    const { data: availability, isLoading } = useAvailability(court.id, todayISO());
+    const isActive = court.status === "ACTIVE";
+    const freeSlots = (availability?.slots ?? []).filter((s) => s.status === "free");
+    const visibleSlots = freeSlots.slice(0, MAX_VISIBLE_SLOTS);
+
+    return (
+        <button onClick={() => onSelectSchedule(court.id)} className={styles["court-tile"]}>
+            <div className={styles["court-tile-head"]}>
+                <strong>{court.name}</strong>
+                <span className={`${styles["status-pill"]} ${isActive ? styles["status-active"] : styles["status-inactive"]}`}>
+                    {isActive ? "ativa" : "inativa"}
+                </span>
+            </div>
+            <span className={styles["court-tile-sport"]}>{court.sports.map((s) => s.name).join(", ") || "—"}</span>
+            <strong className={styles["court-tile-price"]}>{formatPriceCents(court.base_price_hour)}/h</strong>
+            <div className={styles["chip-row"]}>
+                {isLoading ? (
+                    <span className={styles["chip-empty"]}>Carregando horários...</span>
+                ) : visibleSlots.length > 0 ? (
+                    visibleSlots.map((slot) => (
+                        <span key={slot.start_time} className={styles["chip"]}>{formatHourChip(slot.start_time)}</span>
+                    ))
+                ) : (
+                    <span className={styles["chip-empty"]}>Sem horários hoje</span>
+                )}
+            </div>
+        </button>
+    );
 }
 
 function amenityIcon(name: string) {
@@ -144,14 +188,7 @@ export function CourtDetail({ courtId, onNavigate, onSelectSchedule }: CourtDeta
                     </div>
                     <div className={styles["slots"]}>
                         {company.courts.map((court) => (
-                            <button
-                                key={court.id}
-                                onClick={() => onSelectSchedule(court.id)}
-                                className={`${styles["slot"]} ${styles["slot-free"]}`}
-                            >
-                                <strong>{court.name}</strong>
-                                <span>{court.sports.map((s) => s.name).join(", ") || "—"} · {formatPriceCents(court.base_price_hour)}/h</span>
-                            </button>
+                            <CourtTile key={court.id} court={court} onSelectSchedule={onSelectSchedule} />
                         ))}
                     </div>
                     {defaultScheduleCourtId !== null && (

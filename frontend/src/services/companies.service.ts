@@ -39,6 +39,9 @@ export interface CompanySearchCard {
     distance_km: number | null;
     min_price_hour: number | null;
     nota_media: number | null;
+    neighborhood: string;
+    city: string;
+    sports: Sport[];
 }
 
 export interface CompanyDetail {

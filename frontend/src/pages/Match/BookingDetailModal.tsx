@@ -1,12 +1,27 @@
-import { Calendar, Clock, MapPin, Loader2, Users, X } from "lucide-react";
-import { formatHHMM, formatPriceCents } from "../../services/booking.service";
-import { useBookingDetail, useGroupDetail } from "./hooks/useBookings";
+import { useState } from "react";
+import { Calendar, Clock, MapPin, Loader2, Users, X, Ban, Star } from "lucide-react";
+import { ApiError, formatHHMM, formatPriceCents } from "../../services/booking.service";
+import { useBookingDetail, useCancelBooking, useCreateReview, useGroupDetail } from "./hooks/useBookings";
+import { ConfirmModal } from "../../components/ConfirmModal/ConfirmModal";
+import { StarRow } from "../../components/StarRow/StarRow";
 import styles from "./BookingDetailModal.module.scss";
 
 interface BookingDetailModalProps {
     bookingId: number | null;
     onClose: () => void;
 }
+
+const CANCELABLE_STATUSES = new Set(["PENDING", "CONFIRMED"]);
+
+const CANCEL_ERROR_MESSAGE: Record<string, string> = {
+    INVALID_STATE: "Essa reserva não pode mais ser cancelada.",
+    RESOURCE_NOT_OWNED: "Você não pode cancelar essa reserva.",
+};
+
+const REVIEW_ERROR_MESSAGE: Record<string, string> = {
+    ALREADY_REVIEWED: "Você já avaliou essa reserva.",
+    BOOKING_NOT_ELIGIBLE_FOR_REVIEW: "Essa reserva não está elegível para avaliação.",
+};
 
 const STATUS_LABEL: Record<string, string> = {
     PENDING: "Pendente",
@@ -49,10 +64,42 @@ export function BookingDetailModal({ bookingId, onClose }: BookingDetailModalPro
     const { data: booking, isLoading, isError } = useBookingDetail(bookingId);
     const groupId = booking?.type === "GROUP" ? booking.group?.id ?? null : null;
     const { data: group, isLoading: groupLoading } = useGroupDetail(groupId);
+    const cancelBooking = useCancelBooking();
+    const [confirmingCancel, setConfirmingCancel] = useState(false);
+
+    const createReview = useCreateReview();
+    const [reviewRating, setReviewRating] = useState(0);
+    const [reviewComment, setReviewComment] = useState("");
+    const [reviewSent, setReviewSent] = useState(false);
 
     if (!bookingId) return null;
 
+    function handleCancel() {
+        if (!bookingId) return;
+        cancelBooking.mutate(bookingId, { onSuccess: () => setConfirmingCancel(false) });
+    }
+
+    function handleSubmitReview() {
+        if (!bookingId || reviewRating === 0) return;
+        createReview.mutate(
+            { bookingId, rating: reviewRating, comment: reviewComment.trim() || null },
+            { onSuccess: () => setReviewSent(true) }
+        );
+    }
+
+    const cancelError = cancelBooking.error as ApiError | undefined;
+    const friendlyCancelError = cancelError
+        ? (cancelError.code && CANCEL_ERROR_MESSAGE[cancelError.code]) || cancelError.message
+        : null;
+
+    const reviewError = createReview.error as ApiError | undefined;
+    const friendlyReviewError = reviewError
+        ? (reviewError.code && REVIEW_ERROR_MESSAGE[reviewError.code]) || reviewError.message
+        : null;
+    const alreadyReviewed = reviewError?.code === "ALREADY_REVIEWED";
+
     return (
+        <>
         <div className={styles["overlay"]} onClick={onClose} role="dialog" aria-modal="true">
             <div className={styles["modal"]} onClick={(e) => e.stopPropagation()}>
                 <button onClick={onClose} className={styles["close"]} aria-label="Fechar">
@@ -161,10 +208,72 @@ export function BookingDetailModal({ bookingId, onClose }: BookingDetailModalPro
                                 )}
                             </div>
                         )}
+
+                        {booking.status === "COMPLETED" && (
+                            <div className={styles["review-card"]}>
+                                {reviewSent || alreadyReviewed ? (
+                                    <p className={styles["review-thanks"]}>
+                                        {alreadyReviewed ? "Você já avaliou essa reserva." : "Obrigado pela avaliação!"}
+                                    </p>
+                                ) : (
+                                    <>
+                                        <h3 className={styles["review-title"]}>Como foi sua partida?</h3>
+                                        <StarRow rating={reviewRating} size="md" onRate={setReviewRating} />
+                                        <label htmlFor="review-comment" className={styles["review-label"]}>
+                                            Comentário (opcional)
+                                        </label>
+                                        <textarea
+                                            id="review-comment"
+                                            className={styles["review-textarea"]}
+                                            value={reviewComment}
+                                            onChange={(e) => setReviewComment(e.target.value)}
+                                            placeholder="Conte como foi a experiência na quadra..."
+                                            maxLength={2000}
+                                        />
+                                        {friendlyReviewError && !alreadyReviewed && (
+                                            <p className={styles["error"]} role="alert">{friendlyReviewError}</p>
+                                        )}
+                                        <button
+                                            onClick={handleSubmitReview}
+                                            disabled={reviewRating === 0 || createReview.isPending}
+                                            className={styles["review-submit"]}
+                                        >
+                                            <Star width={15} height={15} />
+                                            {createReview.isPending ? "Enviando..." : "Enviar avaliação"}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        {friendlyCancelError && <p className={styles["error"]}>{friendlyCancelError}</p>}
+
+                        {CANCELABLE_STATUSES.has(booking.status) && (
+                            <button
+                                onClick={() => setConfirmingCancel(true)}
+                                disabled={cancelBooking.isPending}
+                                className={styles["cancel-btn"]}
+                            >
+                                {cancelBooking.isPending ? "Cancelando..." : "Cancelar reserva"}
+                            </button>
+                        )}
                     </>
                 )}
             </div>
         </div>
+
+        <ConfirmModal
+            open={confirmingCancel}
+            icon={<Ban width={22} height={22} />}
+            title="Cancelar reserva?"
+            message="Essa ação não pode ser desfeita. Se você cancelar dentro do prazo de reembolso, o valor pago será estornado."
+            confirmLabel="Cancelar reserva"
+            cancelLabel="Voltar"
+            danger
+            onConfirm={handleCancel}
+            onCancel={() => setConfirmingCancel(false)}
+        />
+        </>
     );
 }
 
