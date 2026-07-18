@@ -25,6 +25,7 @@ from src.app.service.availability_service import (
 )
 from src.app.service.payment_service import PaymentService
 from src.environments import REFUND_DEADLINE_HOURS
+from src.infra.datetime_utils import local_datetime
 from src.infra.exception import (
     BadRequestException,
     ConflictException,
@@ -94,7 +95,7 @@ class BookingService:
         def _is_upcoming(booking: Booking) -> bool:
             if booking.status not in (BookingStatus.PENDING, BookingStatus.CONFIRMED):
                 return False
-            end_dt = datetime.combine(booking.date, booking.end_time, tzinfo=timezone.utc)
+            end_dt = local_datetime(booking.date, booking.end_time)
             return end_dt >= now
 
         if scope == "history":
@@ -171,23 +172,40 @@ class BookingService:
                 error_code=ErrorCode.RESOURCE_NOT_OWNED,
             )
         return self._cancel(
-            booking, reason=REASON_CANCELED_BY_COMPANY, force_refund=True
+            booking,
+            reason=REASON_CANCELED_BY_COMPANY,
+            force_refund=True,
+            allow_completed=True,
         )
 
     def _cancel(
-        self, booking: Booking, reason: str, force_refund: bool = False
+        self,
+        booking: Booking,
+        reason: str,
+        force_refund: bool = False,
+        allow_completed: bool = False,
     ) -> tuple[Booking, bool]:
         """Política de reembolso (backend-api-e-fluxos.md §3.5): até
         `REFUND_DEADLINE_HOURS` antes do jogo -> estorno integral; depois ->
         cancela sem reembolso (não é erro, só informativo -
-        `BOOKING_NOT_REFUNDABLE` não bloqueia a ação)."""
-        if booking.status not in (BookingStatus.PENDING, BookingStatus.CONFIRMED):
+        `BOOKING_NOT_REFUNDABLE` não bloqueia a ação).
+
+        `allow_completed`: o estabelecimento (dono da quadra) pode cancelar
+        também reservas já `COMPLETED` — o job de expiração marca como
+        `COMPLETED` toda `CONFIRMED` cujo horário passou, então sem isso o
+        painel não conseguiria cancelar/estornar reservas do dia já vencidas.
+        O cancelamento pelo cliente segue restrito a `PENDING`/`CONFIRMED`."""
+        cancelable = [BookingStatus.PENDING, BookingStatus.CONFIRMED]
+        if allow_completed:
+            cancelable.append(BookingStatus.COMPLETED)
+
+        if booking.status not in cancelable:
             raise ConflictException(
                 message=f"Booking cannot be canceled from status {booking.status.name}",
                 error_code=ErrorCode.INVALID_STATE,
             )
 
-        game_start = datetime.combine(booking.date, booking.start_time, tzinfo=timezone.utc)
+        game_start = local_datetime(booking.date, booking.start_time)
         refund_deadline = game_start - timedelta(hours=REFUND_DEADLINE_HOURS)
         now = datetime.now(timezone.utc)
 
@@ -216,7 +234,7 @@ class BookingService:
                 error_code=ErrorCode.INVALID_TIME_RANGE,
             )
 
-        start_dt = datetime.combine(date, start_time, tzinfo=timezone.utc)
+        start_dt = local_datetime(date, start_time)
         if start_dt <= datetime.now(timezone.utc):
             raise BadRequestException(
                 error_type="Invalid booking time range",
