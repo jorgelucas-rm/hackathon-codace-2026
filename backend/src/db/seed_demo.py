@@ -6,9 +6,9 @@ Decisões locais desta task:
 
 - Região: Fortaleza-CE (coordenadas reais de bairros conhecidos) — o
   hackathon é do IFCE/Codace, então mantém a demo "familiar".
-- Fotos: 1x1 PNG transparente em base64 (`_PLACEHOLDER_PHOTO`) — só para
-  preencher os campos JSON de foto sem inflar o banco/seed com binários
-  reais; suficiente para exercitar o campo na UI.
+- Fotos: nenhuma no seed (`photos=[]`) — companies/courts agora guardam
+  object keys do MinIO, não base64; o seed não sobe arquivos reais pro
+  bucket, só deixa o campo vazio (mesmo padrão dos testes existentes).
 - Idempotência: cada `Booking` semeado carrega uma chave única no campo
   `reason` (`f"seed-demo:{slug}"`) — problema de usar `date`/`start_time`
   como chave natural é que este seed usa datas *relativas a `datetime.now()`*
@@ -50,12 +50,6 @@ from src.app.model.enum.payment_method import PaymentMethod
 from src.app.model.enum.payment_status import PaymentStatus
 from src.app.model.enum.skill_level import SkillLevel
 from src.infra.security import hash_password
-
-# 1x1 pixel PNG transparente — placeholder de foto (ver docstring do módulo).
-_PLACEHOLDER_PHOTO = (
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0"
-    "lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
-)
 
 _DEMO_PASSWORD = "Demo@12345"
 
@@ -177,7 +171,7 @@ def _get_or_create_company(session: Session, data: dict) -> tuple[Company, bool]
         phone=data["phone"],
         latitude=data["latitude"],
         longitude=data["longitude"],
-        photos=[_PLACEHOLDER_PHOTO],
+        photos=[],
         amenities=data["amenities"],
         opening_hours=_ALL_DAYS_OPEN,
     )
@@ -219,7 +213,7 @@ def _get_or_create_court(
         company_id=company.id,
         name=data["name"],
         capacity=data["capacity"],
-        photos=[_PLACEHOLDER_PHOTO],
+        photos=[],
         base_price_hour=data["base_price_hour"],
     )
     court.sports = [

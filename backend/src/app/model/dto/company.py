@@ -1,21 +1,9 @@
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from src.app.model.dto.court import CourtReadDTO
 from src.app.model.dto.validators import CnpjStr, PasswordStr
-
-# ~500KB binário em base64 (overhead ~4/3) — mesmo limite usado em `dto/court.py`.
-MAX_PHOTO_BASE64_CHARS = 700_000
-
-
-def _validate_photos_size(photos: Optional[list[str]]) -> Optional[list[str]]:
-    if not photos:
-        return photos
-    for photo in photos:
-        if len(photo) > MAX_PHOTO_BASE64_CHARS:
-            raise ValueError("Photo exceeds max size of ~500KB")
-    return photos
 
 
 class OpeningHourDTO(BaseModel):
@@ -89,14 +77,8 @@ class CompanyMeUpdateDTO(BaseModel):
     zip_code: Optional[str] = Field(default=None, min_length=1, max_length=10)
     latitude: Optional[float] = Field(default=None, ge=-90, le=90)
     longitude: Optional[float] = Field(default=None, ge=-180, le=180)
-    photos: Optional[list[str]] = Field(default=None)
     amenities: Optional[list[str]] = Field(default=None)
     opening_hours: Optional[list[OpeningHourDTO]] = Field(default=None)
-
-    @field_validator("photos")
-    @classmethod
-    def _validate_photos(cls, v: Optional[list[str]]) -> Optional[list[str]]:
-        return _validate_photos_size(v)
 
 
 class CompanySearchCardDTO(BaseModel):

@@ -60,6 +60,7 @@ from src.app.model.enum.booking_type import BookingType
 from src.app.model.enum.group_member_status import GroupMemberStatus
 from src.app.model.enum.group_status import GroupStatus
 from src.app.model.enum.payment_status import PaymentStatus
+from src.app.adapter import MinioAdapter
 from src.app.repository.booking_repository import BookingRepository
 from src.app.repository.group_member_repository import GroupMemberRepository
 from src.app.repository.group_repository import GroupRepository
@@ -69,6 +70,7 @@ from src.app.service.group_service import GroupService
 from src.app.service.notification_service import NotificationService
 from src.app.service.payment_service import PaymentService
 from src.environments import GROUP_RISK_HOURS, REMINDER_HOURS
+from src.infra.storage import get_minio_client, get_minio_presign_client
 
 logger = logging.getLogger("app.jobs.notification_job")
 
@@ -84,12 +86,16 @@ def _build(session: Session):
     group_member_repository = GroupMemberRepository(session=session)
     notification_repository = NotificationRepository(session=session)
     payment_service = PaymentService(payment_repository=payment_repository)
+    minio_adapter = MinioAdapter(
+        minio_client=get_minio_client(), minio_presign_client=get_minio_presign_client()
+    )
     group_service = GroupService(
         group_repository=group_repository,
         group_member_repository=group_member_repository,
         booking_repository=booking_repository,
         payment_repository=payment_repository,
         payment_service=payment_service,
+        minio_adapter=minio_adapter,
     )
     notification_service = NotificationService(
         notification_repository=notification_repository

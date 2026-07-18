@@ -1,8 +1,9 @@
 import math
 from typing import Optional
 
-from fastapi import Depends
+from fastapi import Depends, UploadFile
 
+from src.app.adapter import MinioAdapter
 from src.app.model.dto.company import (
     CompanyCreateDTO,
     CompanyDetailDTO,
@@ -19,8 +20,15 @@ from src.app.model.enum import ErrorCode
 from src.app.model.enum.court_status import CourtStatus
 from src.app.repository.company_repository import CompanyRepository
 from src.app.repository.review_repository import ReviewRepository
+from src.app.service.photo_upload import (
+    resolve_photo_urls,
+    resolve_single_photo_url,
+    validate_and_upload_photo,
+)
 from src.infra.exception import ConflictException, NotFoundException
 from src.infra.security import hash_password
+
+COMPANY_PHOTO_OBJECT_PREFIX = "company/"
 
 EARTH_RADIUS_KM = 6371.0
 
@@ -43,13 +51,23 @@ class CompanyService:
     def __init__(
         self,
         company_repository: CompanyRepository,
+        minio_adapter: MinioAdapter,
         review_repository: Optional[ReviewRepository] = None,
     ):
         self.company_repository = company_repository
+        self.minio_adapter = minio_adapter
         # Fase F (T-F, extensão aditiva autorizada): opcional para não
         # quebrar quem já injeta `CompanyService` diretamente (fora do
         # `get_service`) sem passar esse novo parâmetro.
         self.review_repository = review_repository
+
+    def to_read_dto(self, company: Company) -> CompanyReadDTO:
+        """`photos` sempre expõe URLs pré-assinadas resolvidas na hora — as
+        object keys no bucket nunca são expostas pela API (mesmo padrão de
+        `UserService.to_read_dto` pro avatar)."""
+        dto = CompanyReadDTO.model_validate(company)
+        dto.photos = resolve_photo_urls(self.minio_adapter, company.photos or [])
+        return dto
 
     def _nota_media(self, company_id: int) -> Optional[float]:
         if self.review_repository is None:
@@ -75,7 +93,7 @@ class CompanyService:
             filters=filters,
         )
         return Pagination[CompanyReadDTO](
-            items=[CompanyReadDTO.model_validate(i) for i in items],
+            items=[self.to_read_dto(i) for i in items],
             total=total,
             total_filtered=total_filtered,
             page=page,
@@ -138,7 +156,9 @@ class CompanyService:
         min_price_hour = min(
             (c.base_price_hour for c in active_courts), default=None
         )
-        cover_photo = company.photos[0] if company.photos else None
+        cover_photo = resolve_single_photo_url(
+            self.minio_adapter, company.photos[0] if company.photos else None
+        )
         return CompanySearchCardDTO(
             id=company.id,
             name=company.name,
@@ -213,11 +233,36 @@ class CompanyService:
     def get_detail(self, company_id: int) -> CompanyDetailDTO:
         company = self.get_by_id(company_id)
         active_courts = self._active_courts(company)
+        courts = []
+        for court in active_courts:
+            court_dto = CourtReadDTO.model_validate(court)
+            court_dto.photos = resolve_photo_urls(self.minio_adapter, court.photos or [])
+            courts.append(court_dto)
         return CompanyDetailDTO(
-            **CompanyReadDTO.model_validate(company).model_dump(),
-            courts=[CourtReadDTO.model_validate(c) for c in active_courts],
+            **self.to_read_dto(company).model_dump(),
+            courts=courts,
             nota_media=self._nota_media(company.id),
         )
+
+    def add_photo(self, company_id: int, file: UploadFile) -> Company:
+        company = self.get_by_id(company_id)
+        object_name = validate_and_upload_photo(
+            self.minio_adapter, file, object_prefix=f"{COMPANY_PHOTO_OBJECT_PREFIX}{company_id}/"
+        )
+        company.photos = [*(company.photos or []), object_name]
+        return self.company_repository.save(entity=company)
+
+    def remove_photo(self, company_id: int, index: int) -> Company:
+        company = self.get_by_id(company_id)
+        photos = list(company.photos or [])
+        if index < 0 or index >= len(photos):
+            raise NotFoundException(resource="Photo", error_code=ErrorCode.NOT_FOUND)
+
+        object_name = photos.pop(index)
+        company.photos = photos
+        company = self.company_repository.save(entity=company)
+        self.minio_adapter.delete_file_from_minio(object_name=object_name)
+        return company
 
     @staticmethod
     def get_service(
@@ -227,8 +272,10 @@ class CompanyService:
         review_repository: ReviewRepository = Depends(
             ReviewRepository.get_instance()
         ),
+        minio_adapter: MinioAdapter = Depends(MinioAdapter.get_instance),
     ) -> "CompanyService":
         return CompanyService(
             company_repository=company_repository,
             review_repository=review_repository,
+            minio_adapter=minio_adapter,
         )

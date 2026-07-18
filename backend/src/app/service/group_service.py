@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import Depends
 
+from src.app.adapter import MinioAdapter
 from src.app.model.dto.booking import BookingCreateDTO
 from src.app.model.dto.group import (
     GroupJoinResponseDTO,
@@ -66,12 +67,14 @@ class GroupService:
         booking_repository: BookingRepository,
         payment_repository: PaymentRepository,
         payment_service: PaymentService,
+        minio_adapter: MinioAdapter,
     ):
         self.group_repository = group_repository
         self.group_member_repository = group_member_repository
         self.booking_repository = booking_repository
         self.payment_repository = payment_repository
         self.payment_service = payment_service
+        self.minio_adapter = minio_adapter
 
     # ------------------------------------------------------------------
     # Leitura / DTOs
@@ -165,13 +168,20 @@ class GroupService:
             members=[self._member_read_dto(m) for m in confirmed_members],
         )
 
-    @staticmethod
-    def _member_read_dto(member: GroupMember) -> GroupMemberReadDTO:
+    def _member_read_dto(self, member: GroupMember) -> GroupMemberReadDTO:
+        """`user_avatar` sempre expõe a URL pré-assinada resolvida na hora —
+        mesmo padrão de `UserService.to_read_dto` (a object key no bucket
+        nunca é exposta pela API)."""
+        avatar_url = (
+            self.minio_adapter.get_file_from_minio(member.user.avatar)
+            if member.user
+            else None
+        )
         return GroupMemberReadDTO(
             id=member.id,
             user_id=member.user_id,
             user_name=member.user.name if member.user else None,
-            user_avatar=member.user.avatar if member.user else None,
+            user_avatar=avatar_url,
             status=member.status.name,
             joined_at=member.joined_at,
         )
@@ -680,6 +690,7 @@ class GroupService:
             PaymentRepository.get_instance()
         ),
         payment_service: PaymentService = Depends(PaymentService.get_service),
+        minio_adapter: MinioAdapter = Depends(MinioAdapter.get_instance),
     ) -> "GroupService":
         return GroupService(
             group_repository=group_repository,
@@ -687,4 +698,5 @@ class GroupService:
             booking_repository=booking_repository,
             payment_repository=payment_repository,
             payment_service=payment_service,
+            minio_adapter=minio_adapter,
         )

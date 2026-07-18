@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, Path, Query
+from fastapi import APIRouter, Body, Depends, File, Path, Query, UploadFile
 
 from src.app.controller.dependencies import get_filters, require_roles
 from src.app.model.dto import (
@@ -34,7 +34,7 @@ async def register_company(
     return Response(
         code=HttpCode.CREATED,
         message="Company registered successfully",
-        data=CompanyReadDTO.model_validate(company),
+        data=service.to_read_dto(company),
     )
 
 
@@ -89,7 +89,47 @@ async def update_my_company(
     return Response(
         code=HttpCode.OK,
         message="Company updated successfully",
-        data=CompanyReadDTO.model_validate(company),
+        data=service.to_read_dto(company),
+    )
+
+
+@router.post(
+    "/me/photos",
+    response_model=Response[CompanyReadDTO],
+    status_code=HttpCode.OK,
+)
+async def upload_my_company_photo(
+    _=Depends(require_roles(Level.COMPANY)),
+    service: CompanyService = Depends(CompanyService.get_service),
+    file: UploadFile = File(...),
+):
+    company = service.add_photo(
+        company_id=RequestContext.get_auth_company().company_id, file=file
+    )
+    return Response(
+        code=HttpCode.OK,
+        message="Photo uploaded successfully",
+        data=service.to_read_dto(company),
+    )
+
+
+@router.delete(
+    "/me/photos/{index}",
+    response_model=Response[CompanyReadDTO],
+    status_code=HttpCode.OK,
+)
+async def delete_my_company_photo(
+    _=Depends(require_roles(Level.COMPANY)),
+    service: CompanyService = Depends(CompanyService.get_service),
+    index: int = Path(..., ge=0),
+):
+    company = service.remove_photo(
+        company_id=RequestContext.get_auth_company().company_id, index=index
+    )
+    return Response(
+        code=HttpCode.OK,
+        message="Photo removed successfully",
+        data=service.to_read_dto(company),
     )
 
 

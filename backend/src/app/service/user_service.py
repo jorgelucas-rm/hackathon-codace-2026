@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 from fastapi import Depends, UploadFile
 
 from src.app.adapter import MinioAdapter
@@ -15,7 +13,8 @@ from src.app.model.dto.user import (
 from src.app.model.entity.user import User
 from src.app.model.enum import ErrorCode, Level
 from src.app.repository.user_repository import UserRepository
-from src.infra.exception import BadRequestException, ConflictException, NotFoundException
+from src.app.service.photo_upload import validate_and_upload_photo
+from src.infra.exception import ConflictException, NotFoundException
 from src.infra.security import hash_password
 
 AVATAR_OBJECT_PREFIX = "avatar/"
@@ -31,13 +30,6 @@ AVATAR_PRESET_FILENAMES = [
 ]
 AVATAR_PRESET_KEYS = {f"{AVATAR_OBJECT_PREFIX}{name}" for name in AVATAR_PRESET_FILENAMES}
 DEFAULT_AVATAR = f"{AVATAR_OBJECT_PREFIX}avatar_00.svg"
-MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024
-ALLOWED_AVATAR_CONTENT_TYPES = {
-    "image/png": ".png",
-    "image/jpeg": ".jpg",
-    "image/jpg": ".jpg",
-    "image/webp": ".webp",
-}
 
 
 class UserService:
@@ -67,27 +59,10 @@ class UserService:
     def upload_avatar(self, user_id: int, file: UploadFile) -> User:
         user = self.get_by_id(user_id)
 
-        extension = ALLOWED_AVATAR_CONTENT_TYPES.get(file.content_type)
-        if not extension:
-            raise BadRequestException(
-                error_type="Invalid avatar file type",
-                details=f"Allowed types: {', '.join(ALLOWED_AVATAR_CONTENT_TYPES)}",
-                error_code=ErrorCode.INVALID_FILE_TYPE,
-            )
-
-        file.file.seek(0, 2)
-        size = file.file.tell()
-        file.file.seek(0)
-        if size > MAX_AVATAR_SIZE_BYTES:
-            raise BadRequestException(
-                error_type="Avatar file too large",
-                details=f"Max size is {MAX_AVATAR_SIZE_BYTES // (1024 * 1024)}MB",
-                error_code=ErrorCode.FILE_TOO_LARGE,
-            )
-
         previous_avatar = user.avatar
-        object_name = f"{AVATAR_OBJECT_PREFIX}{uuid4().hex}{extension}"
-        self.minio_adapter.upload_file_to_minio(file=file, object_name=object_name)
+        object_name = validate_and_upload_photo(
+            self.minio_adapter, file, object_prefix=AVATAR_OBJECT_PREFIX
+        )
 
         user.avatar = object_name
         user = self.user_repository.save(entity=user)
