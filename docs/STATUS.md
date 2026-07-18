@@ -11,8 +11,8 @@ orquestrador conforme `docs/prompt-orquestrador.md`. Branch de integração:
 | 0 | Fundação (constantes, ErrorCodes, transação, tests/conftest.py) | ✅ concluída |
 | 1 | T-A1 Catálogo ∥ T-A2 Perfil+Favoritos | ✅ concluída |
 | 2 | T-B1 Booking+Disponibilidade ∥ T-B2 Pagamento | ✅ concluída |
-| 3 | T-C Grupos ∥ T-D Painel | ⏳ em andamento |
-| 4 | T-E Notif+Job ∥ T-F Reviews+Seed | ⏳ pendente |
+| 3 | T-C Grupos ∥ T-D Painel | ✅ concluída |
+| 4 | T-E Notif+Job ∥ T-F Reviews+Seed | ⏳ em andamento |
 
 ## Matriz-resumo de propriedade
 
@@ -366,3 +366,80 @@ Ordem de merge: **T-C → T-D** → migração única da onda (`open_group`,
 orquestrador: criar grupo → segundo user entra e paga cota → grupo lota →
 booking `confirmed`; cancelamento pelo estabelecimento de um booking com
 grupo real estorna todas as cotas aprovadas e libera o horário.
+
+## Onda 3 — concluída
+
+Merge `T-C → T-D` sem conflitos (arquivos disjuntos por construção — T-C só
+tocou o módulo de grupo + a extensão pontual aditiva em `dto/booking.py`/
+`booking_controller.py`/`availability_service.py`; T-D só criou arquivos
+novos próprios). Ambos entregaram qualidade alta e seguiram o gabarito:
+
+- **T-C**: `create_group_booking` reaproveita lock+overlap+opening-hours com
+  versão própria (não editou `booking_service.py`); `spot_price` arredondado
+  pra cima em centavos; handler `group_payment_effects` trata aprovação
+  (confirma cota, lota → `FULL`+booking `CONFIRMED`) e recusa (libera cota;
+  se o recusado é o criador, cascateia cancelamento do grupo+booking —
+  decisão local documentada: "o grupo só vale se o criador pagar");
+  `leave` bloqueia o criador (`INVALID_STATE`) e reembolsa conforme
+  `REFUND_DEADLINE_HOURS`; `process_deadline` idempotente; slot
+  `open_group` da disponibilidade plugado sem quebrar a assinatura anterior
+  de `generate_slots` (novo parâmetro opcional).
+- **T-D**: agenda (`GET /api/companies/me/schedule`) embute cliente e
+  `GroupPanelSummaryDTO` via `get_panel_summary`; bloqueios e reserva manual
+  reimplementam exclusividade (lock+overlap) em `booking_admin_service.py`
+  próprio, sem tocar `booking_service.py`; cancelamento pelo estabelecimento
+  em rota nova `POST /api/bookings/{id}/cancel-by-company` (decisão local,
+  documentada — evita colidir com `/cancel` do cliente), resolve `group_id`
+  via `get_panel_summary` antes de cancelar o booking e cascateia
+  `cancel_group` quando `type=GROUP`; relatório com receita confirmada,
+  ocupação aproximada e picos (forma exata documentada no código, decisão
+  local por não haver especificação rígida no doc).
+
+REGISTRAR aplicado pelo orquestrador:
+
+- `controller/__init__.py`: registrados `group_controller.router`,
+  `company_schedule_controller.router`, `booking_admin_controller.
+  blocks_router/manual_bookings_router/bookings_admin_router`.
+- `model/entity/__init__.py`: registrados `OpenGroup`, `GroupMember`.
+- `repository/__init__.py`: registrados `GroupRepository`,
+  `GroupMemberRepository`.
+- `service/__init__.py`: `from . import group_payment_effects  # noqa:
+  F401` — necessário para o `register_effect_handler("group_member", ...)`
+  rodar no boot da app; sem isso, `PaymentService.confirm` levantaria
+  `KeyError` ao aprovar/recusar a cota de um membro de grupo.
+- Migração `af1328b0940a_onda_3_open_group_group_member` (Alembic,
+  autogenerate + correção manual do import duplicado de `sqlalchemy`, mesmo
+  padrão de bug visto nas Ondas 1 e 2): tabelas `open_group` e
+  `group_member` novas, sem alteração em tabelas existentes. Aplicada
+  (`alembic upgrade head` a partir de `1aef7416bb48`) e confirmada limpa
+  (autogenerate subsequente gerou diff vazio).
+
+**Nota de ambiente desta sessão**: o worktree usado para orquestrar não
+tinha `backend/src/environments/.env` nem os containers do projeto
+(`docker-compose.dev.yml`) de pé — só um Postgres/Redis de outro projeto
+(Infisical) estavam rodando. Criado um `.env` de desenvolvimento local
+(gitignored, não commitado) com os valores mínimos exigidos por
+`constants.py`, e subido `database`+`minio` via `docker compose -f
+docker-compose.dev.yml up -d database minio` para poder rodar
+`alembic upgrade head`/autogenerate e subir a app para verificação manual.
+
+**Verificação de pronto da onda (sem suíte de testes automatizados — pulada
+nesta rodada por instrução explícita do usuário)**: `alembic upgrade head`
+limpo a partir da Onda 2, autogenerate vazio depois; `uvicorn` sobe sem
+erro; `configure_mappers()` do SQLAlchemy não acusa problema de
+relacionamento/FK; `/docs` e `/openapi.json` respondem 200; `/api/sports`
+retorna o seed de 5 esportes; `/api/groups` (busca pública, banco vazio)
+retorna `200` com lista vazia. Rotas novas confirmadas no `openapi.json`:
+`/api/groups`, `/api/groups/{group_id}`, `/api/groups/{group_id}/join`,
+`/api/groups/{group_id}/leave`, `/api/companies/me/schedule`,
+`/api/companies/me/report`, `/api/companies/me/manual-bookings`,
+`/api/courts/{court_id}/blocks`, `/api/bookings/{booking_id}/block`,
+`/api/bookings/{booking_id}/cancel-by-company`.
+
+**Pendência explícita para quando os testes voltarem a rodar**: nenhuma
+suíte pytest nova foi escrita para T-C/T-D nesta rodada (nem pelos
+executores, nem pelo orquestrador — pedido do usuário), e o teste de
+integração da cascata (grupo lota → `confirmed`; cancelamento pela company
+estornando grupo real) previsto no plano original não foi escrito. Registrar
+como próximo passo antes de considerar a Onda 3 "verde" no sentido pleno do
+critério de pronto da seção 6 do `docs/prompt.md`.
