@@ -5,26 +5,36 @@ import {
 } from "lucide-react";
 import { Screen } from "../../types";
 import { formatPriceCents } from "../../services/companies.service";
-import { getOpenMatchesSync } from "../../services/matches.service";
+import { formatHHMM, formatPriceCents as formatCents } from "../../services/booking.service";
 import { useMe } from "../../hooks/useMe";
 import { useCompanySearch, useSports } from "../../hooks/useCompanies";
+import { useOpenGroups } from "../../hooks/useGroups";
+import { JoinGroupModal } from "../../components/JoinGroupModal/JoinGroupModal";
 import styles from "./Home.module.scss";
+
+function formatMatchDate(date: string): string {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
 
 interface HomeProps {
     onNavigate: (screen: Screen) => void;
     onSelectCourt: (id: number) => void;
     onSelectSport: (sportId: number) => void;
     onSearch: (term: string) => void;
+    onGroupJoined: (paymentId: number) => void;
     dark: boolean;
     toggleDark: () => void;
 }
 
-export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, dark, toggleDark }: HomeProps) {
+export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, onGroupJoined, dark, toggleDark }: HomeProps) {
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
     const { data: sports } = useSports();
     const { data: companiesPage } = useCompanySearch({ size: 6 });
     const recommended = companiesPage?.items ?? [];
-    const matches = getOpenMatchesSync();
+    const { data: openGroups } = useOpenGroups();
+    const matches = (openGroups ?? []).slice(0, 4);
     const { data: me } = useMe();
     const firstName = me?.entity?.name?.split(" ")[0] ?? "";
 
@@ -105,35 +115,40 @@ export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, dark,
                             <span className={styles["eyebrow"]}>Bora jogar</span>
                             <h2 className={styles["section-title"]}>Partidas abertas perto</h2>
                         </div>
-                        <button onClick={() => onNavigate("match")} className={styles["see-all"]}>
+                        <button onClick={() => onNavigate("openMatches")} className={styles["see-all"]}>
                             Ver todas <ChevronRight width={15} height={15} />
                         </button>
                     </div>
                     <div className={styles["matches-grid"]}>
-                        {matches.map((match, i) => {
-                            const pct = Math.round((match.players / match.maxPlayers) * 100);
+                        {matches.map((match) => {
+                            const pct = Math.round((match.filled_spots / match.total_spots) * 100);
+                            const spotsLeft = Math.max(0, match.total_spots - match.filled_spots);
                             return (
-                                <article key={i} onClick={() => onNavigate("match")} className={styles["match-card"]}>
+                                <article key={match.id} onClick={() => setSelectedGroupId(match.id)} className={styles["match-card"]}>
                                     <div className={styles["match-top"]}>
                                         <span className={styles["match-sport"]}><Activity width={18} height={18} /></span>
-                                        <span className={styles["level-chip"]}>{match.level}</span>
+                                        <span className={styles["level-chip"]}>{formatMatchDate(match.date)}</span>
                                     </div>
-                                    <p className={styles["match-name"]}>{match.name}</p>
-                                    <p className={styles["match-place"]}><MapPin width={12} height={12} /> {match.location}</p>
-                                    <p className={styles["match-time"]}><Clock width={12} height={12} /> {match.time}</p>
+                                    <p className={styles["match-name"]}>{match.court_name ?? "Partida aberta"}</p>
+                                    {match.company_name && (
+                                        <p className={styles["match-place"]}><MapPin width={12} height={12} /> {match.company_name}</p>
+                                    )}
+                                    <p className={styles["match-time"]}><Clock width={12} height={12} /> {formatHHMM(match.start_time)} – {formatHHMM(match.end_time)}</p>
                                     <div className={styles["progress-wrap"]}>
                                         <div className={styles["progress-bar"]}>
                                             <div style={{ width: `${pct}%` }} />
                                         </div>
-                                        <span className={styles["progress-text"]}><Users width={12} height={12} /> {match.players}/{match.maxPlayers}</span>
+                                        <span className={styles["progress-text"]}><Users width={12} height={12} /> {match.filled_spots}/{match.total_spots}</span>
                                     </div>
                                     <div className={styles["match-foot"]}>
-                                        <span className={styles["price"]}>{match.price}</span>
-                                        <span className={styles["spots"]}>{match.spots} vagas</span>
+                                        <span className={styles["price"]}>{formatCents(match.spot_price)}</span>
+                                        <span className={styles["spots"]}>{spotsLeft} vagas</span>
                                     </div>
                                 </article>
                             );
                         })}
+
+                        {matches.length === 0 && <p>Nenhuma partida aberta no momento.</p>}
                     </div>
                 </section>
 
@@ -189,6 +204,12 @@ export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, dark,
             <footer className={styles["footer"]}>
                 <p>© 2026 Reservaê · Fortaleza, CE</p>
             </footer>
+
+            <JoinGroupModal
+                groupId={selectedGroupId}
+                onClose={() => setSelectedGroupId(null)}
+                onJoined={(paymentId) => { setSelectedGroupId(null); onGroupJoined(paymentId); }}
+            />
         </div>
     );
 }

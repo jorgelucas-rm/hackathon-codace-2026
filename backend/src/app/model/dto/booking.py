@@ -57,6 +57,15 @@ class BookingReadDTO(BaseModel):
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     created_at: datetime
+    # Campos de conveniência para telas de "minhas reservas" (mesmo padrão
+    # de `GroupReadDTO.court_name`/`company_name`) — evitam um round-trip
+    # extra em `GET /api/courts/{id}` só pra exibir nome da quadra/arena.
+    court_name: Optional[str] = None
+    company_name: Optional[str] = None
+    sport_names: list[str] = Field(default_factory=list)
+    # Só preenchido em `GET /api/bookings/{id}` (detalhe) quando
+    # `type=GROUP` — a listagem (`list_by_user`) não paga o custo extra.
+    group: Optional[GroupPanelSummaryDTO] = None
 
 
 class BookingCreateResponseDTO(BaseModel):

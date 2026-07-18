@@ -1,4 +1,4 @@
-import { Home, Search, Users, User } from "lucide-react";
+import { Home, Search, CalendarCheck, User } from "lucide-react";
 import { Screen } from "../../types";
 import styles from "./BottomNav.module.scss";
 
@@ -10,7 +10,7 @@ interface BottomNavProps {
 const TABS = [
     { screen: "home" as Screen, Icon: Home, label: "Início" },
     { screen: "courts" as Screen, Icon: Search, label: "Quadras" },
-    { screen: "match" as Screen, Icon: Users, label: "Partidas" },
+    { screen: "match" as Screen, Icon: CalendarCheck, label: "Reservas" },
     { screen: "profile" as Screen, Icon: User, label: "Perfil" },
 ];
 

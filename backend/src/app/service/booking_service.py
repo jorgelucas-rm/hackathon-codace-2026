@@ -49,7 +49,13 @@ class BookingService:
         self.payment_service = payment_service
 
     def to_read_dto(self, booking: Booking) -> BookingReadDTO:
-        return BookingReadDTO.model_validate(booking)
+        dto = BookingReadDTO.model_validate(booking)
+        court = booking.court
+        if court:
+            dto.court_name = court.name
+            dto.company_name = court.company.name if court.company else None
+            dto.sport_names = [s.name for s in court.sports]
+        return dto
 
     def get_by_id(self, booking_id: int) -> Booking:
         booking = self.booking_repository.get_by_pk(pk=booking_id)

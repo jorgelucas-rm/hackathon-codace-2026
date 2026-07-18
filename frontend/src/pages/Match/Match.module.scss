@@ -67,364 +67,10 @@
     color: var(--primary);
 }
 
-// ---------- Card principal ----------
-
-.hero-card {
-    margin-top: 16px;
-    padding: 20px;
-    border-radius: $border-radius-xl;
-    background: var(--card);
-    border: 1px solid var(--border);
-    box-shadow: 0 6px 22px var(--shadow-tint);
-}
-
-.badges {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.open-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 11px;
-    border-radius: 999px;
-    font-size: 11.5px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    background: rgba(173, 153, 0, 0.12);
-    color: var(--primary);
-}
-
-.dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--primary);
-}
-
-.level-chip {
-    padding: 5px 11px;
-    border-radius: 999px;
-    font-size: 11.5px;
-    font-weight: 600;
-    background: var(--bg-secondary);
-    color: var(--text-sec);
-}
-
-.title {
-    margin: 0 0 12px;
-    font-family: $font-display;
-    font-weight: 700;
-    font-size: 22px;
-    line-height: 1.25;
-    letter-spacing: -0.02em;
-    color: var(--text);
-}
-
-.meta {
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-    margin-bottom: 16px;
-}
-
-.meta-item {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    font-size: 14px;
-    color: var(--text);
-
-    svg { color: var(--primary); flex-shrink: 0; }
-}
-
-.price-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: $spacing-md;
-    padding-top: 15px;
-    border-top: 1px solid var(--border);
-}
-
-.price-block {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.price {
-    font-size: 21px;
-    font-weight: 800;
-    letter-spacing: -0.01em;
-    color: var(--primary);
-}
-
-.status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    padding: 7px 12px;
-    border-radius: 999px;
-    font-size: 12.5px;
-    font-weight: 700;
-    background: rgba(47, 175, 160, 0.12);
-    color: var(--success);
-}
-
-.dot-ok {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--success);
-}
-
-// ---------- Jogadores confirmados ----------
-
-.players-card {
-    margin-top: 14px;
-    padding: 18px;
-    border-radius: $border-radius-xl;
-    background: var(--card);
-    border: 1px solid var(--border);
-    box-shadow: 0 2px 12px var(--shadow-tint);
-}
-
-.players-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-
-    h3 {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 700;
-        color: var(--text);
-    }
-}
-
-.count {
-    font-size: 20px;
-    font-weight: 800;
-    color: var(--text);
-
-    small {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-sec);
-    }
-}
-
-.avatars-row {
-    display: flex;
-    align-items: center;
-    padding-left: 2px;
-    margin-bottom: 14px;
-}
-
-.avatar-p,
-.slot-more {
-    width: 40px;
-    height: 40px;
-    border-radius: 999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 700;
-    margin-left: -8px;
-
-    &:first-child { margin-left: 0; }
-}
-
-.avatar-p {
-    background: var(--bg-secondary);
-    border: 2px solid var(--card);
-    color: var(--text);
-}
-
-.slot-more {
-    background: var(--card);
-    border: 2px dashed var(--border);
-    color: var(--text-sec);
-}
-
-.progress {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.bar {
-    flex: 1;
-    height: 8px;
-    border-radius: 999px;
-    overflow: hidden;
-    background: var(--bg-secondary);
-}
-
-.fill {
-    height: 100%;
-    border-radius: 999px;
-    background: var(--success);
-}
-
-.left {
-    flex-shrink: 0;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--success);
-}
-
-// ---------- CTA principal ----------
-
-.join {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    height: 50px;
-    margin-top: 16px;
-    border: none;
-    border-radius: $border-radius-md;
-    background: var(--cta);
-    color: #fff;
-    font-size: 15px;
-    font-weight: 700;
-    box-shadow: 0 8px 22px rgba(173, 153, 0, 0.32);
-    transition: transform 0.15s, opacity 0.2s;
-
-    &:active { transform: scale(0.98); }
-
-    // Desktop: não domina a tela — largura limitada e centralizado
-    @media (min-width: 640px) {
-        max-width: 360px;
-        margin-left: auto;
-        margin-right: auto;
-    }
-}
-
-// ---------- Sobre a partida (destaque) ----------
-
-.about-card {
-    margin-top: 22px;
-    padding: 20px;
-    border-radius: $border-radius-xl;
-    background: var(--card);
-    border: 1px solid var(--border);
-    box-shadow: 0 2px 12px var(--shadow-tint);
-}
-
-.about-title {
-    margin: 3px 0 10px;
-    font-family: $font-display;
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--text);
-}
-
-.about-text {
-    margin: 0 0 18px;
-    font-size: 14px;
-    line-height: 1.7;
-    color: var(--text-sec);
-}
-
-.facts {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-}
-
-.fact {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    padding: 12px;
-    border-radius: $border-radius-md;
-    background: var(--bg);
-
-    svg { color: var(--primary); }
-
-    strong {
-        font-size: 13.5px;
-        font-weight: 700;
-        color: var(--text);
-    }
-}
-
-.fact-label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--text-sec);
-}
-
-// ---------- Localização (leve / compacta) ----------
-
-.loc-card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 12px;
-    padding: 13px 15px;
-    border-radius: $border-radius-lg;
-    background: var(--card);
-    border: 1px solid var(--border);
-    box-shadow: 0 1px 6px var(--shadow-tint);
-    cursor: pointer;
-    transition: box-shadow 0.2s;
-
-    &:hover { box-shadow: 0 4px 14px var(--shadow-tint); }
-}
-
-.loc-icon {
-    width: 40px;
-    height: 40px;
-    flex-shrink: 0;
-    border-radius: $border-radius-md;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(173, 153, 0, 0.1);
-    color: var(--primary);
-}
-
-.loc-text {
-    flex: 1;
-    min-width: 0;
-
-    p {
-        margin: 0;
-        font-size: 14px;
-        font-weight: 700;
-        color: var(--text);
-    }
-
-    span {
-        display: block;
-        margin-top: 2px;
-        font-size: 12.5px;
-        color: var(--text-sec);
-    }
-}
-
-.loc-chevron {
-    flex-shrink: 0;
-    color: var(--text-sec);
-}
-
 // ---------- Meus agendamentos ----------
 
 .appointments {
-    margin-top: 26px;
+    margin-top: 20px;
 }
 
 .appt-head {
@@ -478,12 +124,38 @@
 .appt-card {
     display: flex;
     align-items: center;
+    width: 100%;
     gap: 12px;
     padding: 13px 14px;
     border-radius: $border-radius-lg;
     background: var(--card);
     border: 1px solid var(--border);
     box-shadow: 0 2px 10px var(--shadow-tint);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.15s;
+
+    &:hover { box-shadow: 0 4px 14px var(--shadow-tint); }
+    &:active { transform: scale(0.99); }
+}
+
+.appt-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px 0;
+    font-size: 13.5px;
+    color: var(--text-sec);
+}
+
+.spin {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 .appt-icon {

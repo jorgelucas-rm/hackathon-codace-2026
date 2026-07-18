@@ -4,7 +4,9 @@ from typing import Optional, Type
 
 from src.app.model.entity.booking import Booking
 from src.app.model.entity.court import Court, court_sport
+from src.app.model.entity.group_member import GroupMember
 from src.app.model.entity.open_group import OpenGroup
+from src.app.model.enum.group_member_status import GroupMemberStatus
 from src.app.model.enum.group_status import GroupStatus
 from src.app.model.enum.group_visibility import GroupVisibility
 from src.app.repository.base_repository import BaseRepository
@@ -65,6 +67,25 @@ class GroupRepository(BaseRepository[OpenGroup]):
             ).filter(court_sport.c.sport_id == sport_id)
 
         return query.order_by(Booking.date.asc(), Booking.start_time.asc()).all()
+
+    def get_by_member_user(self, user_id: int) -> list[OpenGroup]:
+        """Grupos onde o usuário participa como membro ativo (`GroupMember.status`
+        em PENDING/CONFIRMED) — inclui grupos criados por outros usuários que
+        ele entrou via `POST /api/groups/{id}/join`. Cobre o gap de
+        `BookingService.list_by_user`, que só olha `creator_user_id`."""
+        return (
+            self.session.query(OpenGroup)
+            .join(GroupMember, GroupMember.group_id == OpenGroup.id)
+            .join(Booking, OpenGroup.booking_id == Booking.id)
+            .filter(
+                GroupMember.user_id == user_id,
+                GroupMember.status.in_(
+                    (GroupMemberStatus.PENDING, GroupMemberStatus.CONFIRMED)
+                ),
+            )
+            .order_by(Booking.date.asc(), Booking.start_time.asc())
+            .all()
+        )
 
     @property
     def orderable_fields(self) -> dict:

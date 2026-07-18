@@ -130,6 +130,14 @@ class GroupService:
         )
         return [self._to_read_dto(group) for group in groups]
 
+    def list_my_groups(self, user_id: int) -> list[GroupReadDTO]:
+        """`GET /groups/mine`: grupos onde o usuário é membro ativo — cobre
+        tanto o grupo que ele criou quanto os que entrou via
+        `POST /api/groups/{id}/join` (que não aparecem em
+        `GET /users/me/bookings`, escopado só por `creator_user_id`)."""
+        groups = self.group_repository.get_by_member_user(user_id)
+        return [self._to_read_dto(group) for group in groups]
+
     def _to_read_dto(self, group: OpenGroup) -> GroupReadDTO:
         booking = group.booking
         court = booking.court if booking else None

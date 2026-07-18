@@ -16,18 +16,20 @@ import Courts from "./pages/Courts/Courts";
 import CourtDetail from "./pages/CourtDetail/CourtDetail";
 import Schedule from "./pages/Schedule/Schedule";
 import Match from "./pages/Match/Match";
+import OpenMatches from "./pages/OpenMatches/OpenMatches";
 import Checkout from "./pages/Checkout/Checkout";
 import Profile from "./pages/Profile/Profile";
 import BottomNav from "./components/BottomNav/BottomNav";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
-const NAV_PATHS = ["/home", "/courts", "/schedule", "/match", "/checkout", "/profile"];
+const NAV_PATHS = ["/home", "/courts", "/schedule", "/match", "/open-matches", "/checkout", "/profile"];
 
 function pathToScreen(pathname: string): Screen {
     if (pathname.startsWith("/courts/")) return "courtDetail";
     if (pathname.startsWith("/courts")) return "courts";
     if (pathname.startsWith("/schedule")) return "schedule";
+    if (pathname.startsWith("/open-matches")) return "openMatches";
     if (pathname.startsWith("/match")) return "match";
     if (pathname.startsWith("/checkout")) return "checkout";
     if (pathname.startsWith("/profile")) return "profile";
@@ -115,6 +117,10 @@ function AppShell() {
             navigate(`/courts/${selectedCourtIdRef.current}`);
             return;
         }
+        if (screen === "openMatches") {
+            navigate("/open-matches");
+            return;
+        }
         navigate(`/${screen}`);
     }
 
@@ -159,6 +165,7 @@ function AppShell() {
                                 onSelectCourt={onSelectCourt}
                                 onSelectSport={onSelectSport}
                                 onSearch={onSearch}
+                                onGroupJoined={onBookingCreated}
                                 dark={dark}
                                 toggleDark={toggleDark}
                             />
@@ -175,6 +182,10 @@ function AppShell() {
                         element={<ScheduleRoute onNavigate={onNavigate} onBookingCreated={onBookingCreated} />}
                     />
                     <Route path="/match" element={<Match onNavigate={onNavigate} />} />
+                    <Route
+                        path="/open-matches"
+                        element={<OpenMatches onNavigate={onNavigate} onGroupJoined={onBookingCreated} />}
+                    />
                     <Route path="/checkout" element={<CheckoutRoute onNavigate={onNavigate} />} />
                     <Route path="/checkout/:paymentId" element={<CheckoutRoute onNavigate={onNavigate} />} />
                     <Route path="/profile" element={<Profile onNavigate={onNavigate} />} />

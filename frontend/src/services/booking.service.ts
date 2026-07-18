@@ -7,6 +7,10 @@
 //   GET  /api/courts/{id}/availability?date=  -> slots do dia (público)
 //   POST /api/bookings                        -> cria reserva (auth USER)
 //   GET  /api/bookings/{id}                   -> detalhe da reserva (auth)
+//   GET  /api/users/me/bookings?scope=        -> minhas reservas (auth USER)
+//   GET  /api/groups                          -> busca pública de partidas abertas
+//   GET  /api/groups/{id}                     -> detalhe do grupo (participantes)
+//   POST /api/groups/{id}/join                -> entrar num grupo aberto (auth USER)
 //   GET  /api/payments/{id}                   -> detalhe do pagamento (auth USER)
 //   POST /api/payments/{id}/confirm           -> simulador de gateway (auth USER)
 
@@ -59,6 +63,17 @@ export interface AvailabilityResponse {
 export type BookingStatus = "PENDING" | "CONFIRMED" | "CANCELED" | "COMPLETED" | "BLOCKED";
 export type PaymentStatus = "PENDING" | "APPROVED" | "DENIED" | "REFUNDED";
 
+export interface GroupPanelSummary {
+    id: number;
+    status: string;
+    total_spots: number;
+    min_spots: number;
+    filled_spots: number;
+    spot_price: number;
+    visibility: string;
+    closing_deadline: string;
+}
+
 export interface BookingRead {
     id: number;
     court_id: number;
@@ -74,6 +89,40 @@ export interface BookingRead {
     customer_name: string | null;
     customer_phone: string | null;
     created_at: string;
+    court_name: string | null;
+    company_name: string | null;
+    sport_names: string[];
+    group: GroupPanelSummary | null;
+}
+
+export interface GroupMemberRead {
+    id: number;
+    user_id: number;
+    user_name: string | null;
+    user_avatar: string | null;
+    status: string;
+    joined_at: string;
+}
+
+export interface GroupDetail {
+    id: number;
+    booking_id: number;
+    court_id: number;
+    court_name: string | null;
+    company_id: number | null;
+    company_name: string | null;
+    date: string;
+    start_time: string;
+    end_time: string;
+    status: string;
+    total_spots: number;
+    min_spots: number;
+    filled_spots: number;
+    spot_price: number;
+    visibility: string;
+    closing_deadline: string;
+    leftover_rule: string;
+    members: GroupMemberRead[];
 }
 
 export interface PaymentSummary {
@@ -98,6 +147,17 @@ export interface BookingCreateResponse {
     payment: PaymentSummary;
 }
 
+export interface GroupJoinResponse {
+    member: GroupMemberRead;
+    payment: PaymentSummary;
+    group: GroupPanelSummary;
+}
+
+export interface GroupLeaveResponse {
+    group: GroupPanelSummary;
+    refunded: boolean;
+}
+
 interface Envelope<T> {
     code: number;
     message: string;
@@ -110,10 +170,20 @@ function authHeaders(): Record<string, string> {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export interface ApiError extends Error {
+    code?: string;
+}
+
+function apiError(json: { message?: string; error_code?: string | null } | null, fallbackError: string): ApiError {
+    const err = new Error(json?.message || fallbackError) as ApiError;
+    if (json?.error_code) err.code = json.error_code;
+    return err;
+}
+
 async function getJson<T>(url: string, fallbackError: string, auth = false): Promise<Envelope<T>> {
     const res = await fetch(url, { headers: auth ? authHeaders() : {} });
     const json = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(json?.message || fallbackError);
+    if (!res.ok) throw apiError(json, fallbackError);
     return json as Envelope<T>;
 }
 
@@ -124,7 +194,7 @@ async function postJsonAuth<T>(url: string, body: unknown, fallbackError: string
         body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(json?.message || fallbackError);
+    if (!res.ok) throw apiError(json, fallbackError);
     return json as Envelope<T>;
 }
 
@@ -157,6 +227,59 @@ export async function createClosedBooking(
 
 export async function getBooking(bookingId: number): Promise<BookingRead> {
     const json = await getJson<BookingRead>(`/api/bookings/${bookingId}`, "Erro ao buscar a reserva", true);
+    return json.data;
+}
+
+export async function getMyBookings(scope: "upcoming" | "history"): Promise<BookingRead[]> {
+    const json = await getJson<BookingRead[]>(
+        `/api/users/me/bookings?scope=${scope}`,
+        "Erro ao buscar suas reservas",
+        true
+    );
+    return json.data;
+}
+
+export async function getGroup(groupId: number): Promise<GroupDetail> {
+    const json = await getJson<GroupDetail>(`/api/groups/${groupId}`, "Erro ao buscar o grupo");
+    return json.data;
+}
+
+export interface OpenGroupsFilters {
+    sportId?: number;
+    courtId?: number;
+    date?: string;
+}
+
+export async function listOpenGroups(filters: OpenGroupsFilters = {}): Promise<GroupDetail[]> {
+    const params = new URLSearchParams();
+    if (filters.sportId) params.set("sport_id", String(filters.sportId));
+    if (filters.courtId) params.set("court_id", String(filters.courtId));
+    if (filters.date) params.set("date", filters.date);
+    const qs = params.toString();
+    const json = await getJson<GroupDetail[]>(`/api/groups${qs ? `?${qs}` : ""}`, "Erro ao buscar partidas abertas");
+    return json.data;
+}
+
+export async function joinGroup(groupId: number): Promise<GroupJoinResponse> {
+    const json = await postJsonAuth<GroupJoinResponse>(
+        `/api/groups/${groupId}/join`,
+        {},
+        "Erro ao entrar no grupo"
+    );
+    return json.data;
+}
+
+export async function getMyGroups(): Promise<GroupDetail[]> {
+    const json = await getJson<GroupDetail[]>("/api/groups/mine", "Erro ao buscar seus grupos", true);
+    return json.data;
+}
+
+export async function leaveGroup(groupId: number): Promise<GroupLeaveResponse> {
+    const json = await postJsonAuth<GroupLeaveResponse>(
+        `/api/groups/${groupId}/leave`,
+        {},
+        "Erro ao sair do grupo"
+    );
     return json.data;
 }
 

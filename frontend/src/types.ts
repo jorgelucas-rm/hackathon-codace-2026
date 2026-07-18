@@ -8,5 +8,6 @@ export type Screen =
     | "courtDetail"
     | "schedule"
     | "match"
+    | "openMatches"
     | "profile"
     | "checkout";

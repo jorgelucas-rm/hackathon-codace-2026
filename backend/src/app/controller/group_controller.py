@@ -44,6 +44,26 @@ async def list_public_groups(
 
 
 @router.get(
+    "/mine",
+    response_model=Response[list[GroupReadDTO]],
+    status_code=HttpCode.OK,
+)
+async def list_my_groups(
+    _=Depends(require_roles(Level.USER)),
+    service: GroupService = Depends(GroupService.get_service),
+):
+    """Grupos em que o usuário logado participa como membro ativo (criador
+    ou quem entrou via `join`) — precisa vir antes de `/{group_id}` na
+    ordem de rotas para não ser interpretada como um `group_id`."""
+    groups = service.list_my_groups(user_id=RequestContext.get_auth_user().user_id)
+    return Response(
+        code=HttpCode.OK,
+        message="Groups retrieved successfully",
+        data=groups,
+    )
+
+
+@router.get(
     "/{group_id}",
     response_model=Response[GroupReadDTO],
     status_code=HttpCode.OK,

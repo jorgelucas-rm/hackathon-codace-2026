@@ -9,6 +9,7 @@ from src.app.model.dto.booking import (
     BookingReadDTO,
 )
 from src.app.model.enum import AuthType, HttpCode, Level
+from src.app.model.enum.booking_type import BookingType
 from src.app.service.booking_service import BookingService
 from src.app.service.group_service import GroupService
 from src.infra.context import RequestContext
@@ -68,6 +69,7 @@ async def create_booking(
 async def get_booking(
     _=Depends(require_roles(Level.USER, Level.COMPANY)),
     service: BookingService = Depends(BookingService.get_service),
+    group_service: GroupService = Depends(GroupService.get_service),
     booking_id: int = Path(..., ge=1),
 ):
     auth_type = RequestContext.get_auth_type()
@@ -82,10 +84,13 @@ async def get_booking(
     booking = service.get_detail(
         booking_id=booking_id, user_id=user_id, company_id=company_id
     )
+    dto = service.to_read_dto(booking)
+    if booking.type == BookingType.GROUP:
+        dto.group = group_service.get_panel_summary(booking.id)
     return Response(
         code=HttpCode.OK,
         message="Booking retrieved successfully",
-        data=service.to_read_dto(booking),
+        data=dto,
     )
 
 

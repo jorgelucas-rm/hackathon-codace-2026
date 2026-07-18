@@ -1,144 +1,110 @@
-import { useState } from "react";
-import { ChevronLeft, Clock, Calendar, MapPin, Users, ArrowRight, ChevronRight, Award, Timer, LayoutGrid, CircleDot, Activity, Volleyball, Waves, Dumbbell } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronLeft, Loader2, CircleDot, Activity, Volleyball, Waves, Dumbbell, CalendarClock, Users } from "lucide-react";
 import { Screen } from "../../types";
-import { getOpenMatchesSync } from "../../services/matches.service";
+import { BookingRead, formatHHMM, formatPriceCents } from "../../services/booking.service";
+import { useMyBookings } from "./hooks/useBookings";
+import { useMyGroups } from "../../hooks/useGroups";
+import { BookingDetailModal } from "./BookingDetailModal";
+import { JoinGroupModal } from "../../components/JoinGroupModal/JoinGroupModal";
 import styles from "./Match.module.scss";
 
 interface MatchProps {
     onNavigate: (screen: Screen) => void;
 }
 
-const PLAYERS = ["LC", "MF", "AF", "VI", "CA", "AP", "JO"];
-
-type ApptTab = "proximos" | "concluidos" | "cancelados";
+type ApptTab = "proximos" | "concluidos" | "cancelados" | "grupos";
 
 const APPT_TABS: { key: ApptTab; label: string }[] = [
     { key: "proximos", label: "Próximos" },
+    { key: "grupos", label: "Meus grupos" },
     { key: "concluidos", label: "Concluídos" },
     { key: "cancelados", label: "Cancelados" },
 ];
 
-const APPOINTMENTS: Record<ApptTab, { Icon: typeof CircleDot; name: string; date: string; time: string; price: string; status: string; kind: "upcoming" | "done" | "cancel" }[]> = {
-    proximos: [
-        { Icon: CircleDot, name: "Futebol Society — Quinta", date: "12 jul", time: "20:00", price: "R$25", status: "Confirmado", kind: "upcoming" },
-        { Icon: Waves, name: "Beach Tennis Duplas", date: "15 jul", time: "18:00", price: "R$35", status: "Confirmado", kind: "upcoming" },
-    ],
-    concluidos: [
-        { Icon: Volleyball, name: "Vôlei Praia", date: "10 jul", time: "17:00", price: "R$70", status: "Concluído", kind: "done" },
-        { Icon: Activity, name: "Futsal — Quarta", date: "05 jul", time: "19:00", price: "R$20", status: "Concluído", kind: "done" },
-    ],
-    cancelados: [
-        { Icon: Dumbbell, name: "Basquete 3x3", date: "02 jul", time: "09:00", price: "R$20", status: "Cancelado", kind: "cancel" },
-    ],
+const GROUP_STATUS_LABEL: Record<string, string> = {
+    OPEN: "Aguardando vagas",
+    FULL: "Lotado",
+    CONFIRMED: "Confirmado",
+    CANCELED: "Cancelado",
 };
 
+const GROUP_STATUS_BADGE: Record<string, "upcoming" | "done" | "cancel"> = {
+    OPEN: "upcoming",
+    FULL: "upcoming",
+    CONFIRMED: "done",
+    CANCELED: "cancel",
+};
+
+const SPORT_ICON: Record<string, typeof CircleDot> = {
+    "Futebol": CircleDot,
+    "Futebol Society": CircleDot,
+    "Futsal": Activity,
+    "Vôlei": Volleyball,
+    "Vôlei de Praia": Volleyball,
+    "Beach Tennis": Waves,
+    "Basquete": Dumbbell,
+};
+
+const STATUS_LABEL: Record<string, string> = {
+    PENDING: "Pendente",
+    CONFIRMED: "Confirmado",
+    COMPLETED: "Concluído",
+    CANCELED: "Cancelado",
+    BLOCKED: "Bloqueado",
+};
+
+const STATUS_BADGE: Record<string, "upcoming" | "done" | "cancel"> = {
+    PENDING: "upcoming",
+    CONFIRMED: "upcoming",
+    COMPLETED: "done",
+    CANCELED: "cancel",
+    BLOCKED: "cancel",
+};
+
+const badgeClass = { upcoming: "badge-upcoming", done: "badge-done", cancel: "badge-cancel" };
+
+function iconFor(booking: BookingRead) {
+    return SPORT_ICON[booking.sport_names[0] ?? ""] ?? CalendarClock;
+}
+
+function formatShortDate(date: string): string {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
 export function Match({ onNavigate }: MatchProps) {
-    const match = getOpenMatchesSync()[0];
-    const pct = Math.round((PLAYERS.length / match.maxPlayers) * 100);
     const [apptTab, setApptTab] = useState<ApptTab>("proximos");
-    const appointments = APPOINTMENTS[apptTab];
-    const badgeClass = { upcoming: "badge-upcoming", done: "badge-done", cancel: "badge-cancel" };
+    const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
+    const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+
+    const upcoming = useMyBookings("upcoming");
+    const history = useMyBookings("history");
+    const myGroups = useMyGroups();
+
+    const isLoading = apptTab === "grupos" ? myGroups.isLoading : apptTab === "proximos" ? upcoming.isLoading : history.isLoading;
+    const isError = apptTab === "grupos" ? myGroups.isError : apptTab === "proximos" ? upcoming.isError : history.isError;
+
+    const appointments = useMemo(() => {
+        if (apptTab === "proximos") return upcoming.data ?? [];
+        if (apptTab === "concluidos") return (history.data ?? []).filter((b) => b.status === "COMPLETED");
+        if (apptTab === "cancelados") return (history.data ?? []).filter((b) => b.status === "CANCELED");
+        return [];
+    }, [apptTab, upcoming.data, history.data]);
+
+    const groups = myGroups.data ?? [];
 
     return (
         <div className={styles["container"]}>
-            {/* ---------- Top bar compacto (bege, integrado) ---------- */}
             <header className={styles["header"]}>
                 <div className={styles["inner"]}>
                     <button onClick={() => onNavigate("home")} className={styles["back"]} aria-label="Voltar">
                         <ChevronLeft width={20} height={20} />
                     </button>
-                    <span className={styles["header-label"]}>Detalhes da partida</span>
+                    <span className={styles["header-label"]}>Reservas</span>
                 </div>
             </header>
 
             <main className={styles["inner"]}>
-                {/* ---------- Card principal: tudo pra decidir ---------- */}
-                <section className={styles["hero-card"]}>
-                    <div className={styles["badges"]}>
-                        <span className={styles["open-badge"]}><i className={styles["dot"]} /> Grupo Aberto</span>
-                        <span className={styles["level-chip"]}>{match.level}</span>
-                    </div>
-
-                    <h1 className={styles["title"]}>{match.name}</h1>
-
-                    <div className={styles["meta"]}>
-                        <span className={styles["meta-item"]}><Calendar width={16} height={16} /> Hoje</span>
-                        <span className={styles["meta-item"]}><Clock width={16} height={16} /> {match.time}</span>
-                        <span className={styles["meta-item"]}><MapPin width={16} height={16} /> {match.location} · Aldeota</span>
-                    </div>
-
-                    <div className={styles["price-row"]}>
-                        <div className={styles["price-block"]}>
-                            <span className={styles["eyebrow"]}>Valor por jogador</span>
-                            <strong className={styles["price"]}>{match.price.replace("/jogador", "")}</strong>
-                        </div>
-                        <span className={styles["status-pill"]}><i className={styles["dot-ok"]} /> {match.spots} vagas restantes</span>
-                    </div>
-                </section>
-
-                {/* ---------- Jogadores confirmados (compacto) ---------- */}
-                <section className={styles["players-card"]}>
-                    <div className={styles["players-head"]}>
-                        <h3>Jogadores confirmados</h3>
-                        <span className={styles["count"]}>{PLAYERS.length}<small>/{match.maxPlayers}</small></span>
-                    </div>
-
-                    <div className={styles["avatars-row"]}>
-                        {PLAYERS.map((p) => (
-                            <span key={p} className={styles["avatar-p"]}>{p}</span>
-                        ))}
-                        <span className={styles["slot-more"]}>+{match.spots}</span>
-                    </div>
-
-                    <div className={styles["progress"]}>
-                        <div className={styles["bar"]}><div className={styles["fill"]} style={{ width: `${pct}%` }} /></div>
-                        <span className={styles["left"]}>{match.spots} vagas</span>
-                    </div>
-                </section>
-
-                {/* ---------- CTA principal ---------- */}
-                <button onClick={() => onNavigate("checkout")} className={styles["join"]}>
-                    Entrar na Partida <ArrowRight width={18} height={18} />
-                </button>
-
-                {/* ---------- Sobre a partida (destaque) ---------- */}
-                <section className={styles["about-card"]}>
-                    <span className={styles["eyebrow"]}>Sobre</span>
-                    <h3 className={styles["about-title"]}>Sobre a partida</h3>
-                    <p className={styles["about-text"]}>
-                        Jogo semanal na Arena Prime Futebol. Nível intermediário, aberto a todos.
-                        Chegue 15 minutos antes para aquecer. Colete e bola por conta da casa.
-                    </p>
-                    <div className={styles["facts"]}>
-                        <div className={styles["fact"]}>
-                            <Award width={16} height={16} />
-                            <span className={styles["fact-label"]}>Nível</span>
-                            <strong>{match.level}</strong>
-                        </div>
-                        <div className={styles["fact"]}>
-                            <Timer width={16} height={16} />
-                            <span className={styles["fact-label"]}>Duração</span>
-                            <strong>1h30</strong>
-                        </div>
-                        <div className={styles["fact"]}>
-                            <LayoutGrid width={16} height={16} />
-                            <span className={styles["fact-label"]}>Formato</span>
-                            <strong>Society 7</strong>
-                        </div>
-                    </div>
-                </section>
-
-                {/* ---------- Localização (leve e compacta) ---------- */}
-                <section className={styles["loc-card"]}>
-                    <span className={styles["loc-icon"]}><MapPin width={18} height={18} /></span>
-                    <div className={styles["loc-text"]}>
-                        <p>{match.location}</p>
-                        <span>Av. Santos Dumont, 5532 · Aldeota, Fortaleza — CE</span>
-                    </div>
-                    <ChevronRight width={18} height={18} className={styles["loc-chevron"]} />
-                </section>
-
-                {/* ---------- Meus agendamentos ---------- */}
                 <section className={styles["appointments"]}>
                     <div className={styles["appt-head"]}>
                         <span className={styles["eyebrow"]}>Suas partidas</span>
@@ -157,22 +123,81 @@ export function Match({ onNavigate }: MatchProps) {
                         ))}
                     </div>
 
-                    <div className={styles["appt-list"]}>
-                        {appointments.length > 0 ? appointments.map((a, i) => (
-                            <div key={i} className={styles["appt-card"]}>
-                                <span className={styles["appt-icon"]}><a.Icon width={20} height={20} /></span>
-                                <div className={styles["appt-info"]}>
-                                    <p className={styles["appt-name"]}>{a.name}</p>
-                                    <p className={styles["appt-sub"]}>{a.date} · {a.time} · {a.price}</p>
-                                </div>
-                                <span className={`${styles["badge"]} ${styles[badgeClass[a.kind]]}`}>{a.status}</span>
-                            </div>
-                        )) : (
-                            <p className={styles["appt-empty"]}>Nenhuma partida nesta categoria.</p>
-                        )}
-                    </div>
+                    {isLoading && (
+                        <div className={styles["appt-loading"]}>
+                            <Loader2 width={20} height={20} className={styles["spin"]} />
+                            <span>Carregando{apptTab === "grupos" ? " seus grupos" : " suas reservas"}...</span>
+                        </div>
+                    )}
+
+                    {isError && !isLoading && (
+                        <p className={styles["appt-empty"]}>
+                            Não foi possível carregar {apptTab === "grupos" ? "seus grupos" : "suas reservas"} agora.
+                        </p>
+                    )}
+
+                    {!isLoading && !isError && apptTab === "grupos" && (
+                        <div className={styles["appt-list"]}>
+                            {groups.length > 0 ? groups.map((g) => {
+                                const kind = GROUP_STATUS_BADGE[g.status] ?? "upcoming";
+                                return (
+                                    <button
+                                        key={g.id}
+                                        className={styles["appt-card"]}
+                                        onClick={() => setSelectedGroupId(g.id)}
+                                    >
+                                        <span className={styles["appt-icon"]}><Users width={20} height={20} /></span>
+                                        <div className={styles["appt-info"]}>
+                                            <p className={styles["appt-name"]}>{g.court_name ?? "Partida em grupo"}</p>
+                                            <p className={styles["appt-sub"]}>
+                                                {formatShortDate(g.date)} · {formatHHMM(g.start_time)} · {g.filled_spots}/{g.total_spots} vagas · {formatPriceCents(g.spot_price)}
+                                            </p>
+                                        </div>
+                                        <span className={`${styles["badge"]} ${styles[badgeClass[kind]]}`}>{GROUP_STATUS_LABEL[g.status] ?? g.status}</span>
+                                    </button>
+                                );
+                            }) : (
+                                <p className={styles["appt-empty"]}>Você ainda não participa de nenhum grupo.</p>
+                            )}
+                        </div>
+                    )}
+
+                    {!isLoading && !isError && apptTab !== "grupos" && (
+                        <div className={styles["appt-list"]}>
+                            {appointments.length > 0 ? appointments.map((b) => {
+                                const Icon = iconFor(b);
+                                const kind = STATUS_BADGE[b.status] ?? "upcoming";
+                                return (
+                                    <button
+                                        key={b.id}
+                                        className={styles["appt-card"]}
+                                        onClick={() => setSelectedBookingId(b.id)}
+                                    >
+                                        <span className={styles["appt-icon"]}><Icon width={20} height={20} /></span>
+                                        <div className={styles["appt-info"]}>
+                                            <p className={styles["appt-name"]}>{b.court_name ?? "Reserva"}</p>
+                                            <p className={styles["appt-sub"]}>
+                                                {formatShortDate(b.date)} · {formatHHMM(b.start_time)} · {formatPriceCents(b.type === "GROUP" ? b.group?.spot_price ?? b.total_price : b.total_price)}
+                                            </p>
+                                        </div>
+                                        <span className={`${styles["badge"]} ${styles[badgeClass[kind]]}`}>{STATUS_LABEL[b.status] ?? b.status}</span>
+                                    </button>
+                                );
+                            }) : (
+                                <p className={styles["appt-empty"]}>Nenhuma partida nesta categoria.</p>
+                            )}
+                        </div>
+                    )}
                 </section>
             </main>
+
+            <BookingDetailModal bookingId={selectedBookingId} onClose={() => setSelectedBookingId(null)} />
+            <JoinGroupModal
+                groupId={selectedGroupId}
+                mode="manage"
+                onClose={() => setSelectedGroupId(null)}
+                onJoined={() => setSelectedGroupId(null)}
+            />
         </div>
     );
 }
