@@ -9,8 +9,8 @@ orquestrador conforme `docs/prompt-orquestrador.md`. Branch de integração:
 | Onda | Escopo | Status |
 |---|---|---|
 | 0 | Fundação (constantes, ErrorCodes, transação, tests/conftest.py) | ✅ concluída |
-| 1 | T-A1 Catálogo ∥ T-A2 Perfil+Favoritos | ⏳ em andamento |
-| 2 | T-B1 Booking+Disponibilidade ∥ T-B2 Pagamento | ⏳ pendente |
+| 1 | T-A1 Catálogo ∥ T-A2 Perfil+Favoritos | ✅ concluída |
+| 2 | T-B1 Booking+Disponibilidade ∥ T-B2 Pagamento | ⏳ em andamento |
 | 3 | T-C Grupos ∥ T-D Painel | ⏳ pendente |
 | 4 | T-E Notif+Job ∥ T-F Reviews+Seed | ⏳ pendente |
 
@@ -142,3 +142,37 @@ Mesma regra: nullable/`server_default` obrigatório.
 Uma revisão Alembic **gerada pelo orquestrador** depois do merge de T-A1 e
 T-A2, cobrindo as duas entidades novas + as duas extensões de tabela
 existente. Ordem de merge: **T-A1 → T-A2 → migração**.
+
+## Onda 1 — concluída
+
+Merge `T-A1 → T-A2` sem conflitos (arquivos disjuntos, como esperado pela
+interseção zero). REGISTRAR aplicado pelo orquestrador:
+
+- `controller/__init__.py`: registrados `sport_controller.router`,
+  `court_controller.router` e `court_controller.me_router`.
+- `model/entity/__init__.py`: registrados `Sport`, `Court`, `court_sport`
+  (consistência do metadata para Alembic autogenerate — não estritamente
+  necessário para os testes, que importam as entidades diretamente).
+- `main.py`: lifespan novo (`asynccontextmanager`) chamando
+  `seed_sports(session)` no startup do app (sessão própria via
+  `session_maker()`, fechada no `finally`). T-A1 tinha deixado isso opcional
+  fora do escopo dele; decisão do orquestrador foi plugar, já que o doc pede
+  seed idempotente "no startup ou na migração".
+- Migração `0d5b73afd62a_onda_1_...` (Alembic, autogenerate + revisão manual
+  do import duplicado): tabelas `sport`, `court`, `court_sport` novas;
+  `company` e `user` com as colunas descritas nas tabelas acima. Aplicada e
+  testada (`alembic upgrade head` a partir da revisão anterior, banco dev).
+
+**Achado do executor T-A2, corrigido pelo orquestrador**: o banco de teste
+(`codace_test`) é compartilhado entre worktrees/execuções contra o mesmo
+Postgres do compose. `tests/conftest.py` fazia só `create_all` — se um
+executor anterior já tinha criado uma tabela com schema mais antigo (menos
+colunas), o `create_all` do executor seguinte não adicionava as colunas
+faltantes, e a suíte quebrava com `UndefinedColumn`. Corrigido: a fixture de
+sessão agora faz `drop_all` + `create_all` a cada sessão de teste. Isso vale
+para todas as ondas seguintes — não deve se repetir.
+
+**Verificação de pronto da onda**: `pytest` (20 passed), app sobe
+(`python run.py`), `/docs` e `/openapi.json` respondem 200, seed de sports
+aparece em `GET /api/sports` (5 esportes), `GET /api/companies` responde
+paginação vazia (sem companies cadastradas ainda no banco dev).

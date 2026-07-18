@@ -1,14 +1,29 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.app.controller import admin_router, router
+from src.app.service.sport_service import seed_sports
 from src.infra.exception import DomainException, global_exception_handler
 from src.infra.middleware import Middleware
 from src.infra.middleware.rate_limiter import limiter
+from src.infra.storage.database import session_maker
 
-app = FastAPI(title="API - Hackathon Codace 2026", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    session = session_maker()
+    try:
+        seed_sports(session)
+    finally:
+        session.close()
+    yield
+
+
+app = FastAPI(title="API - Hackathon Codace 2026", version="0.1.0", lifespan=lifespan)
 app.state.limiter = limiter
 
 app.add_exception_handler(RateLimitExceeded, global_exception_handler)

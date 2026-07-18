@@ -5,6 +5,11 @@ from src.app.controller.company_controller import (
     admin_router as companies_admin_router,
     router as companies_router,
 )
+from src.app.controller.court_controller import (
+    me_router as courts_me_router,
+    router as courts_router,
+)
+from src.app.controller.sport_controller import router as sports_router
 from src.app.controller.user_controller import (
     admin_router as users_admin_router,
     router as users_router,
@@ -20,3 +25,7 @@ admin_router.include_router(users_admin_router)
 
 router.include_router(companies_router)
 admin_router.include_router(companies_admin_router)
+
+router.include_router(courts_me_router)
+router.include_router(courts_router)
+router.include_router(sports_router)

@@ -74,6 +74,12 @@ TestingSessionLocal = sessionmaker(bind=engine, autoflush=False)
 
 @pytest.fixture(scope="session", autouse=True)
 def _setup_database():
+    # drop_all + create_all (não só create_all): o database de teste é
+    # compartilhado entre worktrees/execuções contra o mesmo Postgres — se um
+    # executor anterior já criou uma tabela com um schema mais antigo (menos
+    # colunas), um create_all sozinho não adiciona as colunas que faltam.
+    # Recriar do zero a cada sessão de teste evita schema desatualizado.
+    BaseModel.metadata.drop_all(bind=engine)
     BaseModel.metadata.create_all(bind=engine)
     yield
 
