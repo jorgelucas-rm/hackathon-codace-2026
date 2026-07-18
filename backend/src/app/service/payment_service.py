@@ -1,17 +1,19 @@
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Optional
+from typing import Callable, Literal, Optional
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from src.app.model.dto.payment import PaymentSummaryDTO
+from src.app.model.dto.payment import PaymentReadDTO, PaymentSummaryDTO
 from src.app.model.entity.payment import Payment
 from src.app.model.enum import ErrorCode
 from src.app.model.enum.payment_method import PaymentMethod
 from src.app.model.enum.payment_status import PaymentStatus
 from src.app.repository.payment_repository import PaymentRepository
 from src.environments import GATEWAY_FEE_PCT, PAYMENT_TTL_MINUTES, PLATFORM_FEE_PCT
-from src.infra.exception import NotFoundException
+from src.infra.exception import BadRequestException, ConflictException, NotFoundException
+
+ConfirmResult = Literal["approved", "denied"]
 
 # Contrato Onda 2 (B1<->B2) — esqueleto commitado pelo orquestrador.
 #
@@ -51,6 +53,9 @@ class PaymentService:
     def to_summary_dto(self, payment: Payment) -> PaymentSummaryDTO:
         return PaymentSummaryDTO.model_validate(payment)
 
+    def to_read_dto(self, payment: Payment) -> PaymentReadDTO:
+        return PaymentReadDTO.model_validate(payment)
+
     def get_by_id(self, payment_id: int) -> Payment:
         payment = self.payment_repository.get_by_pk(pk=payment_id)
         if not payment:
@@ -85,7 +90,7 @@ class PaymentService:
     def confirm(
         self,
         payment_id: int,
-        result: str,
+        result: ConfirmResult,
         method: Optional[PaymentMethod] = None,
     ) -> Payment:
         """`POST /api/payments/{id}/confirm` — simulador de gateway.
@@ -96,18 +101,73 @@ class PaymentService:
         Na aprovação, grava o split (`company_payout`/`platform_fee`/
         `gateway_fee` com `PLATFORM_FEE_PCT`/`GATEWAY_FEE_PCT`) e despacha
         `on_approved(reference_id, session)` do handler registrado para
-        `reference_type`; na recusa, despacha `on_denied`. TODO(T-B2):
-        implementar corpo completo (split, dispatch, commit único no fim
-        cobrindo Payment + efeito)."""
-        raise NotImplementedError("T-B2 implementa o corpo desta função")
+        `reference_type`; na recusa, despacha `on_denied`.
+
+        Ausência de handler registrado para `reference_type` é bug de
+        integração (quem cria o pagamento também precisa registrar o efeito
+        via `register_effect_handler`) — deixado estourar `KeyError` em vez
+        de silenciar, para o erro aparecer cedo em desenvolvimento.
+
+        Único `commit()` no fim, cobrindo o update do Payment e o efeito em
+        cadeia (que também só usa `add()` na mesma sessão)."""
+        payment = self.get_by_id(payment_id)
+
+        if payment.status != PaymentStatus.PENDING:
+            return payment
+
+        if result == "approved":
+            payment.method = method
+            payment.status = PaymentStatus.APPROVED
+            payment.platform_fee = payment.amount * PLATFORM_FEE_PCT // 100
+            payment.gateway_fee = payment.amount * GATEWAY_FEE_PCT // 100
+            payment.company_payout = (
+                payment.amount - payment.platform_fee - payment.gateway_fee
+            )
+            payment = self.payment_repository.add(entity=payment)
+
+            handler = _on_approved_handlers.get(payment.reference_type)
+            if handler is None:
+                raise KeyError(
+                    "No on_approved effect handler registered for "
+                    f"reference_type={payment.reference_type!r}"
+                )
+            handler(payment.reference_id, self.payment_repository.session)
+        elif result == "denied":
+            payment.status = PaymentStatus.DENIED
+            payment = self.payment_repository.add(entity=payment)
+
+            handler = _on_denied_handlers.get(payment.reference_type)
+            if handler is None:
+                raise KeyError(
+                    "No on_denied effect handler registered for "
+                    f"reference_type={payment.reference_type!r}"
+                )
+            handler(payment.reference_id, self.payment_repository.session)
+        else:
+            raise BadRequestException(
+                error_type="Invalid payment confirmation result",
+                details="result must be 'approved' or 'denied'",
+                error_code=ErrorCode.INVALID_PARAMETER,
+            )
+
+        self.payment_repository.commit()
+        return payment
 
     def refund(self, payment_id: int) -> Payment:
         """Estorna um pagamento `APPROVED` (`status=REFUNDED`,
         `refunded_at=now`). Via `add()` — **sem commit**: o caller (cancel de
-        booking/group) finaliza a transação. TODO(T-B2): implementar corpo
-        completo (validar estado, `PAYMENT_ALREADY_RESOLVED` se não
-        aplicável)."""
-        raise NotImplementedError("T-B2 implementa o corpo desta função")
+        booking/group) finaliza a transação."""
+        payment = self.get_by_id(payment_id)
+
+        if payment.status != PaymentStatus.APPROVED:
+            raise ConflictException(
+                message="Payment is not eligible for refund",
+                error_code=ErrorCode.PAYMENT_ALREADY_RESOLVED,
+            )
+
+        payment.status = PaymentStatus.REFUNDED
+        payment.refunded_at = datetime.now(timezone.utc)
+        return self.payment_repository.add(entity=payment)
 
     @staticmethod
     def get_service(
