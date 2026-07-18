@@ -1,5 +1,5 @@
 import { useState, useRef, useLayoutEffect } from "react";
-import { Mail, Lock, Eye, EyeOff, User, Building2, Hash, MapPin, ArrowRight, ArrowLeft } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, Building2, Hash, MapPin, ArrowRight, ArrowLeft, Check, X } from "lucide-react";
 import { UserType } from "../../services/auth.service";
 import { useLogin, useLoginCompany } from "./hooks/useLogin";
 import { useSignup, useSignupCompany } from "../Signup/hooks/useSignup";
@@ -18,6 +18,16 @@ const ACCOUNT_TYPES = [
 
 const STRENGTH_LABELS = ["Muito fraca", "Fraca", "Boa", "Excelente!"];
 const STRENGTH_COLORS = ["#E8D7BD", "#F27A3F", "#AD9900", "#2FAFA0"];
+
+// Mesmas regras do backend (PasswordStr em validators.py) — replicadas aqui
+// para avisar o motivo da senha ser recusada antes de bater na API.
+const PASSWORD_RULES: { id: string; label: string; test: (p: string) => boolean }[] = [
+    { id: "len", label: "mínimo 8 caracteres", test: (p) => p.length >= 8 },
+    { id: "upper", label: "uma letra maiúscula", test: (p) => /[A-Z]/.test(p) },
+    { id: "lower", label: "uma letra minúscula", test: (p) => /[a-z]/.test(p) },
+    { id: "digit", label: "um número", test: (p) => /\d/.test(p) },
+    { id: "special", label: "um caractere especial", test: (p) => /[^A-Za-z0-9]/.test(p) },
+];
 
 export function Login({ onLogin }: LoginProps) {
     const [mode, setMode] = useState<"login" | "signup">("login");
@@ -52,11 +62,14 @@ export function Login({ onLogin }: LoginProps) {
     const [zipCode, setZipCode] = useState("");
     const sIsCompany = signupType === "company";
     const sPending = signupUser.isPending || signupCompany.isPending;
+    const [sError, setSError] = useState("");
 
     const strength = password.length >= 12 ? 3 : password.length >= 8 ? 2 : password.length >= 4 ? 1 : 0;
     const strengthColor = STRENGTH_COLORS[strength];
-    const userValid = !!name && !!email && !!password;
-    const companyValid = !!cnpj && !!name && !!email && !!password
+    const passwordRules = PASSWORD_RULES.map((rule) => ({ ...rule, met: rule.test(password) }));
+    const passwordValid = passwordRules.every((rule) => rule.met);
+    const userValid = !!name && !!email && passwordValid;
+    const companyValid = !!cnpj && !!name && !!email && passwordValid
         && !!street && !!number && !!neighborhood && !!city && !!state && !!zipCode;
 
     // Altura do card acompanha o formulário visível
@@ -85,26 +98,38 @@ export function Login({ onLogin }: LoginProps) {
 
     const handleCreate = (e: React.FormEvent) => {
         e.preventDefault();
+        setSError("");
+        const onError = (err: unknown) => setSError(err instanceof Error ? err.message : "Erro ao criar a conta.");
         if (sIsCompany) {
             if (!companyValid) return;
             signupCompany.mutate(
                 { cnpj, name, email, password, street, number, neighborhood, city, state, zip_code: zipCode },
-                { onSuccess: onLogin }
+                { onSuccess: onLogin, onError }
             );
         } else {
             if (!userValid) return;
-            signupUser.mutate({ name, email, password }, { onSuccess: onLogin });
+            signupUser.mutate({ name, email, password }, { onSuccess: onLogin, onError });
         }
     };
 
     const strengthMeter = password.length > 0 && (
-        <div className={styles["strength"]}>
-            <div className={styles["strength-bars"]}>
-                {[1, 2, 3].map((i) => (
-                    <span key={i} style={{ background: i <= strength ? strengthColor : "var(--bg-secondary)" }} />
-                ))}
+        <div className={styles["password-feedback"]}>
+            <div className={styles["strength"]}>
+                <div className={styles["strength-bars"]}>
+                    {[1, 2, 3].map((i) => (
+                        <span key={i} style={{ background: i <= strength ? strengthColor : "var(--bg-secondary)" }} />
+                    ))}
+                </div>
+                <p style={{ color: strengthColor }}>{STRENGTH_LABELS[strength]}</p>
             </div>
-            <p style={{ color: strengthColor }}>{STRENGTH_LABELS[strength]}</p>
+            <ul className={styles["pw-rules"]}>
+                {passwordRules.map((rule) => (
+                    <li key={rule.id} className={rule.met ? styles["pw-rule-ok"] : styles["pw-rule-bad"]}>
+                        {rule.met ? <Check width={12} height={12} /> : <X width={12} height={12} />}
+                        {rule.label}
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 
@@ -176,7 +201,7 @@ export function Login({ onLogin }: LoginProps) {
                             <p className={styles["panel-sub"]}>Rápido e gratuito. Comece a reservar agora.</p>
                         </div>
 
-                        {typeSegment(signupType, setSignupType)}
+                        {typeSegment(signupType, (t) => { setSignupType(t); setSError(""); })}
 
                         {!sIsCompany ? (
                             <>
@@ -245,6 +270,8 @@ export function Login({ onLogin }: LoginProps) {
                         <p className={styles["terms"]}>
                             Ao criar conta, você concorda com nossos <strong>Termos de Uso</strong> e <strong>Política de Privacidade</strong>.
                         </p>
+
+                        {sError && <p className={styles["error"]}>{sError}</p>}
 
                         <Button type="submit" {...{ disabled: sPending || (sIsCompany ? !companyValid : !userValid) }}>
                             {sPending ? "Criando conta..." : "Criar conta"}
