@@ -158,3 +158,18 @@ class BaseRepository(Generic[T], ABC):
     def delete(self, entity: T) -> None:
         self.session.delete(entity)
         self.session.commit()
+
+    def add(self, entity: T) -> T:
+        """Registra a entidade na sessão e faz flush (PK disponível), sem commitar.
+
+        Use em operações multi-entidade que precisam de uma única transação
+        (ex.: booking + payment, cadeias de efeito): chame `add()` em cada
+        repositório envolvido e finalize com um único `commit()` no service,
+        depois de todas as entidades adicionadas.
+        """
+        self.session.add(entity)
+        self.session.flush()
+        return entity
+
+    def commit(self) -> None:
+        self.session.commit()

@@ -58,3 +58,7 @@ uvloop==0.22.1
 watchfiles==1.2.0
 websockets==16.1
 wrapt==2.2.2
+
+# --- test tooling (Onda 0) ---
+pytest==8.4.2
+pytest-cov==7.0.0
