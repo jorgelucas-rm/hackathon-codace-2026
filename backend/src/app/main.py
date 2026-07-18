@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,7 +7,10 @@ from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.app.controller import admin_router, router
+from src.app.jobs.notification_job import run_loop
 from src.app.service.sport_service import seed_sports
+from src.db.seed_demo import seed_demo
+from src.environments import SEED_DEMO
 from src.infra.exception import DomainException, global_exception_handler
 from src.infra.middleware import Middleware
 from src.infra.middleware.rate_limiter import limiter
@@ -18,9 +22,16 @@ async def lifespan(_: FastAPI):
     session = session_maker()
     try:
         seed_sports(session)
+        if SEED_DEMO:
+            seed_demo(session)
     finally:
         session.close()
-    yield
+
+    job_task = asyncio.create_task(run_loop(session_maker))
+    try:
+        yield
+    finally:
+        job_task.cancel()
 
 
 app = FastAPI(title="API - Hackathon Codace 2026", version="0.1.0", lifespan=lifespan)

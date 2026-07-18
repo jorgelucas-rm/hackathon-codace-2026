@@ -3,5 +3,7 @@ from .booking_repository import BookingRepository
 from .company_repository import CompanyRepository
 from .group_member_repository import GroupMemberRepository
 from .group_repository import GroupRepository
+from .notification_repository import NotificationRepository
 from .payment_repository import PaymentRepository
+from .review_repository import ReviewRepository
 from .user_repository import UserRepository

@@ -3,5 +3,7 @@ from . import group_payment_effects  # noqa: F401 — registra efeito "group_mem
 from .auth_service import AuthService
 from .company_service import CompanyService
 from .group_service import GroupService
+from .notification_service import NotificationService
 from .payment_service import PaymentService
+from .review_service import ReviewService
 from .user_service import UserService

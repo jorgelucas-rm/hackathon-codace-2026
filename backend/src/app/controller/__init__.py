@@ -23,7 +23,13 @@ from src.app.controller.court_controller import (
     router as courts_router,
 )
 from src.app.controller.group_controller import router as groups_router
+from src.app.controller.notification_controller import router as notifications_router
 from src.app.controller.payment_controller import router as payments_router
+from src.app.controller.review_controller import (
+    bookings_router as reviews_bookings_router,
+    companies_router as reviews_companies_router,
+    router as reviews_router,
+)
 from src.app.controller.sport_controller import router as sports_router
 from src.app.controller.user_controller import (
     admin_router as users_admin_router,
@@ -56,3 +62,9 @@ router.include_router(company_schedule_router)
 router.include_router(booking_blocks_router)
 router.include_router(manual_bookings_router)
 router.include_router(booking_admin_router)
+
+router.include_router(notifications_router)
+
+router.include_router(reviews_bookings_router)
+router.include_router(reviews_companies_router)
+router.include_router(reviews_router)
