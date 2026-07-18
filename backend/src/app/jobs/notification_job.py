@@ -68,6 +68,7 @@ from src.app.repository.notification_repository import NotificationRepository
 from src.app.repository.payment_repository import PaymentRepository
 from src.app.service.group_service import GroupService
 from src.app.service.notification_service import NotificationService
+from src.infra.datetime_utils import local_datetime
 from src.app.service.payment_service import PaymentService
 from src.environments import GROUP_RISK_HOURS, REMINDER_HOURS
 from src.infra.storage import get_minio_client, get_minio_presign_client
@@ -182,7 +183,7 @@ def _step_complete_past_bookings(deps: dict) -> None:
     )
     changed = False
     for booking in confirmed_bookings:
-        end_dt = datetime.combine(booking.date, booking.end_time, tzinfo=timezone.utc)
+        end_dt = local_datetime(booking.date, booking.end_time)
         if end_dt <= now:
             booking.status = BookingStatus.COMPLETED
             booking_repository.add(entity=booking)
@@ -248,7 +249,7 @@ def _step_notify_risk_and_reminders(deps: dict) -> None:
         session.query(Booking).filter(Booking.status == BookingStatus.CONFIRMED).all()
     )
     for booking in confirmed_bookings:
-        start_dt = datetime.combine(booking.date, booking.start_time, tzinfo=timezone.utc)
+        start_dt = local_datetime(booking.date, booking.start_time)
         if not (now < start_dt <= reminder_deadline):
             continue
 

@@ -20,9 +20,11 @@ import OpenMatches from "./pages/OpenMatches/OpenMatches";
 import Checkout from "./pages/Checkout/Checkout";
 import Profile from "./pages/Profile/Profile";
 import Account from "./pages/Account/Account";
+import CompanyPanel, { PANEL_TABS, PanelTab } from "./pages/CompanyPanel/CompanyPanel";
 import BottomNav from "./components/BottomNav/BottomNav";
 import BrandBar from "./components/BrandBar/BrandBar";
-import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
+import ProtectedRoute, { CompanyProtectedRoute } from "./components/ProtectedRoute/ProtectedRoute";
+import { getAuthType } from "./services/auth.service";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 const NAV_PATHS = ["/home", "/courts", "/schedule", "/match", "/open-matches", "/checkout", "/profile"];
@@ -39,18 +41,33 @@ function pathToScreen(pathname: string): Screen {
     return "home";
 }
 
+// Destino padrão de quem já está logado: empresa cai no painel, jogador na home.
+function loggedInHome(): string {
+    return getAuthType() === "company" ? "/panel" : "/home";
+}
+
 // Decide a tela inicial ("/") com base na sessão já validada pelo AuthContext.
 function RootRedirect() {
     const { status } = useAuth();
     if (status === "loading") return <div style={{ padding: 40, textAlign: "center" }}>Carregando...</div>;
-    return <Navigate to={status === "authenticated" ? "/home" : "/onboarding"} replace />;
+    return <Navigate to={status === "authenticated" ? loggedInHome() : "/onboarding"} replace />;
 }
 
 // Usuário já logado não deve ver a tela de login de novo.
 function LoginRoute({ onLogin }: { onLogin: () => void }) {
     const { status } = useAuth();
-    if (status === "authenticated") return <Navigate to="/home" replace />;
+    if (status === "authenticated") return <Navigate to={loggedInHome()} replace />;
     return <Login onLogin={onLogin} />;
+}
+
+// /panel/:tab — valida a aba e injeta a navegação entre abas do painel.
+function CompanyPanelRoute() {
+    const { tab } = useParams();
+    const navigate = useNavigate();
+    if (!tab || !PANEL_TABS.includes(tab as PanelTab)) {
+        return <Navigate to="/panel/agenda" replace />;
+    }
+    return <CompanyPanel tab={tab as PanelTab} onChangeTab={(t) => navigate(`/panel/${t}`)} />;
 }
 
 function CourtsRoute({ onNavigate, onSelectCourt }: {
@@ -153,7 +170,8 @@ function AppShell() {
 
     function onLogin() {
         auth.refresh();
-        navigate("/home");
+        // Empresa vai direto para o painel; jogador segue para a home.
+        navigate(loggedInHome());
     }
 
     return (
@@ -199,6 +217,11 @@ function AppShell() {
                     <Route path="/checkout/:paymentId" element={<CheckoutRoute onNavigate={onNavigate} />} />
                     <Route path="/profile" element={<Profile onNavigate={onNavigate} />} />
                     <Route path="/account" element={<Account onNavigate={onNavigate} />} />
+                </Route>
+
+                <Route element={<CompanyProtectedRoute />}>
+                    <Route path="/panel" element={<Navigate to="/panel/agenda" replace />} />
+                    <Route path="/panel/:tab" element={<CompanyPanelRoute />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

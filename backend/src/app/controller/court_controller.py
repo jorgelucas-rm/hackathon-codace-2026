@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, File, Path, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Path, Query, UploadFile
 
 from src.app.controller.dependencies import require_roles
 from src.app.model.dto import Response
@@ -99,6 +99,32 @@ async def delete_my_court_photo(
         code=HttpCode.OK,
         message="Photo removed successfully",
         data=service.to_read_dto(court),
+    )
+
+
+@me_router.delete(
+    "/{court_id}",
+    response_model=Response[None],
+    status_code=HttpCode.OK,
+)
+async def delete_my_court(
+    _=Depends(require_roles(Level.COMPANY)),
+    service: CourtService = Depends(CourtService.get_service),
+    court_id: int = Path(..., ge=1),
+    force: bool = Query(
+        False,
+        description="Exclui em cascata as reservas da quadra em vez de recusar (409).",
+    ),
+):
+    service.delete(
+        court_id=court_id,
+        company_id=RequestContext.get_auth_company().company_id,
+        force=force,
+    )
+    return Response(
+        code=HttpCode.OK,
+        message="Court deleted successfully",
+        data=None,
     )
 
 
