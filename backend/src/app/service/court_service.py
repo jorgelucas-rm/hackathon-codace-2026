@@ -13,10 +13,11 @@ from src.app.model.entity.sport import Sport
 from src.app.model.enum import ErrorCode
 from src.app.repository.court_repository import CourtRepository
 from src.app.repository.sport_repository import SportRepository
-from src.app.service.photo_upload import resolve_photo_urls, validate_and_upload_photo
-from src.infra.exception import ForbiddenException, NotFoundException
-
-COURT_PHOTO_OBJECT_PREFIX = "court/"
+from src.infra.exception import (
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+)
 
 
 class CourtService:
@@ -84,37 +85,30 @@ class CourtService:
 
         return self.court_repository.save(entity=court)
 
-    def add_photo(self, court_id: int, company_id: int, file: UploadFile) -> Court:
+    def delete(self, court_id: int, company_id: int, force: bool = False) -> None:
         court = self.get_by_id(court_id)
+
         if court.company_id != company_id:
             raise ForbiddenException(
                 message="You do not own this court",
                 error_code=ErrorCode.RESOURCE_NOT_OWNED,
             )
 
-        object_name = validate_and_upload_photo(
-            self.minio_adapter, file, object_prefix=f"{COURT_PHOTO_OBJECT_PREFIX}{court_id}/"
-        )
-        court.photos = [*(court.photos or []), object_name]
-        return self.court_repository.save(entity=court)
-
-    def remove_photo(self, court_id: int, company_id: int, index: int) -> Court:
-        court = self.get_by_id(court_id)
-        if court.company_id != company_id:
-            raise ForbiddenException(
-                message="You do not own this court",
-                error_code=ErrorCode.RESOURCE_NOT_OWNED,
+        # Sem `force`, quadras com histórico de reservas não são excluídas —
+        # oriente a desativar (arquivar). Com `force=True`, a exclusão é em
+        # cascata e apaga também as reservas/grupos/avaliações da quadra.
+        bookings_count = len(court.bookings)
+        if bookings_count and not force:
+            raise ConflictException(
+                message=(
+                    f"Court has {bookings_count} booking(s) and cannot be "
+                    "deleted — deactivate it, or delete permanently to also "
+                    "remove its bookings."
+                ),
+                error_code=ErrorCode.CONFLICT,
             )
 
-        photos = list(court.photos or [])
-        if index < 0 or index >= len(photos):
-            raise NotFoundException(resource="Photo", error_code=ErrorCode.NOT_FOUND)
-
-        object_name = photos.pop(index)
-        court.photos = photos
-        court = self.court_repository.save(entity=court)
-        self.minio_adapter.delete_file_from_minio(object_name=object_name)
-        return court
+        self.court_repository.delete_cascade(court_id=court.id)
 
     def _resolve_sports(self, sport_ids: list[int]) -> list[Sport]:
         if not sport_ids:

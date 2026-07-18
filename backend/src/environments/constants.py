@@ -19,6 +19,14 @@ def get_env_default(name: str, default: str) -> str:
     return os.getenv(name, default)
 
 
+# Fuso do estabelecimento (horário de parede das reservas). As reservas
+# guardam data+hora locais (o que o usuário digita na agenda); comparar com
+# `datetime.now(timezone.utc)` só fica correto se a hora local for tornada
+# ciente nesse fuso. Offset fixo (Brasil não tem mais horário de verão) —
+# evita depender de tzdata no container.
+APP_UTC_OFFSET_HOURS = int(get_env_default("APP_UTC_OFFSET_HOURS", "-3"))
+
+
 ############### SECURITY CONFIG ###############
 JWT_SECRET = get_env("JWT_SECRET")
 JWT_ALGORITHM = get_env("JWT_ALGORITHM")

@@ -38,6 +38,7 @@ from src.app.service.availability_service import (
 from src.app.service.notification_service import NotificationService
 from src.app.service.payment_service import PaymentService
 from src.environments import REFUND_DEADLINE_HOURS
+from src.infra.datetime_utils import local_datetime
 from src.infra.exception import (
     BadRequestException,
     ConflictException,
@@ -446,7 +447,7 @@ class GroupService:
 
         if payment and payment.status == PaymentStatus.APPROVED:
             game_start = (
-                datetime.combine(booking.date, booking.start_time, tzinfo=timezone.utc)
+                local_datetime(booking.date, booking.start_time)
                 if booking
                 else None
             )
