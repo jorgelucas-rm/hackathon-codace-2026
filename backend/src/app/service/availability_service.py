@@ -16,6 +16,7 @@ from src.app.repository.group_member_repository import GroupMemberRepository
 from src.app.repository.group_repository import GroupRepository
 from src.app.repository.payment_repository import PaymentRepository
 from src.app.service.payment_service import PaymentService
+from src.infra.datetime_utils import local_datetime
 from src.infra.exception import NotFoundException
 
 # Ordem de `date.weekday()` (0=segunda) mapeada para os códigos usados em
@@ -202,7 +203,7 @@ class AvailabilityService:
                 slot_start < busy_end and slot_end > busy_start
                 for busy_start, busy_end in busy_intervals
             )
-            is_past = datetime.combine(date, slot_start, tzinfo=timezone.utc) < now
+            is_past = local_datetime(date, slot_start) < now
 
             group = None
             if is_busy or is_past:

@@ -12,7 +12,11 @@ from src.app.model.entity.sport import Sport
 from src.app.model.enum import ErrorCode
 from src.app.repository.court_repository import CourtRepository
 from src.app.repository.sport_repository import SportRepository
-from src.infra.exception import ForbiddenException, NotFoundException
+from src.infra.exception import (
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+)
 
 
 class CourtService:
@@ -74,6 +78,31 @@ class CourtService:
             court.sports = self._resolve_sports(dto.sport_ids)
 
         return self.court_repository.save(entity=court)
+
+    def delete(self, court_id: int, company_id: int, force: bool = False) -> None:
+        court = self.get_by_id(court_id)
+
+        if court.company_id != company_id:
+            raise ForbiddenException(
+                message="You do not own this court",
+                error_code=ErrorCode.RESOURCE_NOT_OWNED,
+            )
+
+        # Sem `force`, quadras com histórico de reservas não são excluídas —
+        # oriente a desativar (arquivar). Com `force=True`, a exclusão é em
+        # cascata e apaga também as reservas/grupos/avaliações da quadra.
+        bookings_count = len(court.bookings)
+        if bookings_count and not force:
+            raise ConflictException(
+                message=(
+                    f"Court has {bookings_count} booking(s) and cannot be "
+                    "deleted — deactivate it, or delete permanently to also "
+                    "remove its bookings."
+                ),
+                error_code=ErrorCode.CONFLICT,
+            )
+
+        self.court_repository.delete_cascade(court_id=court.id)
 
     def _resolve_sports(self, sport_ids: list[int]) -> list[Sport]:
         if not sport_ids:

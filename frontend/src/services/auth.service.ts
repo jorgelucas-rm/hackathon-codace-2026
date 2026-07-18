@@ -58,13 +58,22 @@ export interface MeUserRead {
 }
 
 const TOKEN_KEY = "reservae_token";
+// Tipo de conta logada ("user" | "company") — persiste junto com o token
+// para o app saber qual painel/rotas mostrar após reload.
+const AUTH_TYPE_KEY = "reservae_auth_type";
 
 export function getToken(): string | null {
     return localStorage.getItem(TOKEN_KEY);
 }
 
+export function getAuthType(): UserType | null {
+    const value = localStorage.getItem(AUTH_TYPE_KEY);
+    return value === "user" || value === "company" ? value : null;
+}
+
 export function clearToken() {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(AUTH_TYPE_KEY);
 }
 
 interface Envelope<T> {
@@ -109,7 +118,10 @@ export async function login(data: LoginData) {
     }
 
     const json = await postJson<string>("/api/auth/user-login", data, "Erro ao fazer o login");
-    if (json.data) localStorage.setItem(TOKEN_KEY, json.data);
+    if (json.data) {
+        localStorage.setItem(TOKEN_KEY, json.data);
+        localStorage.setItem(AUTH_TYPE_KEY, "user");
+    }
     return json;
 }
 
@@ -120,7 +132,10 @@ export async function loginCompany(data: CompanyLoginData) {
     }
 
     const json = await postJson<string>("/api/auth/company-login", data, "Erro ao fazer o login");
-    if (json.data) localStorage.setItem(TOKEN_KEY, json.data);
+    if (json.data) {
+        localStorage.setItem(TOKEN_KEY, json.data);
+        localStorage.setItem(AUTH_TYPE_KEY, "company");
+    }
     return json;
 }
 
