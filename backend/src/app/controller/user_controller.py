@@ -10,6 +10,8 @@ from src.app.model.dto import (
     UserReadDTO,
     UserUpdateDTO,
 )
+from src.app.model.dto.favorite import FavoriteCourtsDTO
+from src.app.model.dto.user import UserProfileUpdateDTO
 from src.app.model.enum import HttpCode, Level
 from src.app.service import UserService
 from src.infra.context import RequestContext
@@ -88,6 +90,80 @@ async def select_my_avatar_preset(
         code=HttpCode.OK,
         message="Avatar updated successfully",
         data=service.to_read_dto(user),
+    )
+
+
+@router.patch(
+    "/me",
+    response_model=Response[UserReadDTO],
+    status_code=HttpCode.OK,
+)
+async def update_my_profile(
+    _=Depends(require_roles(Level.ADMIN, Level.USER)),
+    service: UserService = Depends(UserService.get_service),
+    dto: UserProfileUpdateDTO = Body(...),
+):
+    user = service.update_profile(
+        user_id=RequestContext.get_auth_user().user_id, dto=dto
+    )
+    return Response(
+        code=HttpCode.OK,
+        message="Profile updated successfully",
+        data=service.to_read_dto(user),
+    )
+
+
+@router.get(
+    "/me/favorites",
+    response_model=Response[FavoriteCourtsDTO],
+    status_code=HttpCode.OK,
+)
+async def list_my_favorites(
+    _=Depends(require_roles(Level.ADMIN, Level.USER)),
+    service: UserService = Depends(UserService.get_service),
+):
+    return Response(
+        code=HttpCode.OK,
+        message="Favorites retrieved successfully",
+        data=service.list_favorites(user_id=RequestContext.get_auth_user().user_id),
+    )
+
+
+@router.post(
+    "/me/favorites/{court_id}",
+    response_model=Response[FavoriteCourtsDTO],
+    status_code=HttpCode.OK,
+)
+async def add_my_favorite(
+    _=Depends(require_roles(Level.ADMIN, Level.USER)),
+    service: UserService = Depends(UserService.get_service),
+    court_id: int = Path(..., ge=1),
+):
+    return Response(
+        code=HttpCode.OK,
+        message="Favorite added successfully",
+        data=service.add_favorite(
+            user_id=RequestContext.get_auth_user().user_id, court_id=court_id
+        ),
+    )
+
+
+@router.delete(
+    "/me/favorites/{court_id}",
+    response_model=Response[FavoriteCourtsDTO],
+    status_code=HttpCode.OK,
+)
+async def remove_my_favorite(
+    _=Depends(require_roles(Level.ADMIN, Level.USER)),
+    service: UserService = Depends(UserService.get_service),
+    court_id: int = Path(..., ge=1),
+):
+    return Response(
+        code=HttpCode.OK,
+        message="Favorite removed successfully",
+        data=service.remove_favorite(
+            user_id=RequestContext.get_auth_user().user_id, court_id=court_id
+        ),
     )
 
 
