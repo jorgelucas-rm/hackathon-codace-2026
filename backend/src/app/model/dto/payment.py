@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -27,3 +27,29 @@ class PaymentSummaryDTO(BaseModel):
     method: Optional[serializable_enum(PaymentMethod)] = None
     status: serializable_enum(PaymentStatus)
     created_at: datetime
+
+
+class PaymentReadDTO(BaseModel):
+    """Forma completa de leitura (`GET /api/payments/{id}`), incluindo o
+    split e o estorno — além do que `PaymentSummaryDTO` expõe."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    reference_type: str
+    reference_id: int
+    amount: int
+    method: Optional[serializable_enum(PaymentMethod)] = None
+    status: serializable_enum(PaymentStatus)
+    company_payout: Optional[int] = None
+    platform_fee: Optional[int] = None
+    gateway_fee: Optional[int] = None
+    refunded_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class PaymentConfirmDTO(BaseModel):
+    """Body de `POST /api/payments/{id}/confirm` — simulador de gateway."""
+
+    result: Literal["approved", "denied"]
+    method: Optional[serializable_enum(PaymentMethod)] = None
