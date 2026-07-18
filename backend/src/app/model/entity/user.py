@@ -22,3 +22,8 @@ class User(BaseModel):
     situation: Mapped[bool] = mapped_column(
         Boolean, server_default=text("true"), nullable=False
     )
+    avatar: Mapped[str] = mapped_column(
+        String(500),
+        server_default=text("'avatar/default.png'"),
+        nullable=False,
+    )

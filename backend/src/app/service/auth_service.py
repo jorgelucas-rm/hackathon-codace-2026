@@ -2,6 +2,7 @@ from typing import Union
 
 from fastapi import Depends
 
+from src.app.adapter import MinioAdapter
 from src.app.model.dto import (
     LoginCompany,
     LoginUser,
@@ -24,9 +25,11 @@ class AuthService:
         self,
         user_repository: UserRepository,
         company_repository: CompanyRepository,
+        minio_adapter: MinioAdapter,
     ):
         self.user_repository = user_repository
         self.company_repository = company_repository
+        self.minio_adapter = minio_adapter
 
     def user_login(self, login: LoginUser) -> str:
         """Autentica um usuário pelo e-mail e senha, retornando um token JWT."""
@@ -92,7 +95,9 @@ class AuthService:
         if user is None:
             raise NotFoundException(resource="User", error_code=ErrorCode.NOT_FOUND)
 
-        return MeUserReadDTO(entity=UserReadDTO.model_validate(user))
+        entity = UserReadDTO.model_validate(user)
+        entity.avatar = self.minio_adapter.get_file_from_minio(user.avatar)
+        return MeUserReadDTO(entity=entity)
 
     def _get_me_company(self) -> MeCompanyReadDTO:
         auth = RequestContext.get_auth_company()
@@ -111,8 +116,10 @@ class AuthService:
         company_repository: CompanyRepository = Depends(
             CompanyRepository.get_instance()
         ),
+        minio_adapter: MinioAdapter = Depends(MinioAdapter.get_instance),
     ) -> "AuthService":
         return AuthService(
             user_repository=user_repository,
             company_repository=company_repository,
+            minio_adapter=minio_adapter,
         )
