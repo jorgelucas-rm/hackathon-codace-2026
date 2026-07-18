@@ -9,6 +9,7 @@ import styles from "./CourtDetail.module.scss";
 interface CourtDetailProps {
     courtId: number;
     onNavigate: (screen: Screen) => void;
+    onSelectSchedule: (courtId: number) => void;
 }
 
 function amenityIcon(name: string) {
@@ -27,7 +28,7 @@ function initialsOf(name: string | null): string {
     return (first + last).toUpperCase();
 }
 
-export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
+export function CourtDetail({ courtId, onNavigate, onSelectSchedule }: CourtDetailProps) {
     const { data: company, isLoading, isError } = useCompanyDetail(courtId);
     const { data: reviewsPage } = useCompanyReviews(courtId);
     const [photoSlide, setPhotoSlide] = useState(0);
@@ -67,9 +68,11 @@ export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
         new Set(company.courts.flatMap((c) => c.sports.map((s) => s.name)))
     );
     const activeCourts = company.courts.filter((c) => c.status === "ACTIVE");
-    const cheapestCourt = activeCourts.length
-        ? Math.min(...activeCourts.map((c) => c.base_price_hour))
+    const cheapestActiveCourt = activeCourts.length
+        ? activeCourts.reduce((min, c) => (c.base_price_hour < min.base_price_hour ? c : min))
         : null;
+    const cheapestCourt = cheapestActiveCourt?.base_price_hour ?? null;
+    const defaultScheduleCourtId = cheapestActiveCourt?.id ?? company.courts[0]?.id ?? null;
     const coverPhoto = company.photos[photoSlide] ?? company.photos[0] ?? null;
     const addressLine = `${company.street}, ${company.number} · ${company.neighborhood}`;
 
@@ -143,7 +146,7 @@ export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
                         {company.courts.map((court) => (
                             <button
                                 key={court.id}
-                                onClick={() => onNavigate("schedule")}
+                                onClick={() => onSelectSchedule(court.id)}
                                 className={`${styles["slot"]} ${styles["slot-free"]}`}
                             >
                                 <strong>{court.name}</strong>
@@ -151,9 +154,11 @@ export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
                             </button>
                         ))}
                     </div>
-                    <button onClick={() => onNavigate("schedule")} className={styles["all-slots"]}>
-                        Ver agenda completa <ArrowRight width={15} height={15} />
-                    </button>
+                    {defaultScheduleCourtId !== null && (
+                        <button onClick={() => onSelectSchedule(defaultScheduleCourtId)} className={styles["all-slots"]}>
+                            Ver agenda completa <ArrowRight width={15} height={15} />
+                        </button>
+                    )}
                 </section>
 
                 {/* ---------- Comodidades ---------- */}
@@ -246,7 +251,11 @@ export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
                         <span>A partir de</span>
                         <strong>{formatPriceCents(cheapestCourt)}</strong>
                     </div>
-                    <button onClick={() => onNavigate("schedule")} className={styles["cta-btn"]}>
+                    <button
+                        onClick={() => defaultScheduleCourtId !== null && onSelectSchedule(defaultScheduleCourtId)}
+                        disabled={defaultScheduleCourtId === null}
+                        className={styles["cta-btn"]}
+                    >
                         Escolher horário <ArrowRight width={18} height={18} />
                     </button>
                 </div>

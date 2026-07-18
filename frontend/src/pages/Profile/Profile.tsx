@@ -6,6 +6,7 @@ import {
 import { Screen } from "../../types";
 import { ConfirmModal } from "../../components/ConfirmModal/ConfirmModal";
 import { useMe } from "../../hooks/useMe";
+import { useAuth } from "../../contexts/AuthContext";
 import styles from "./Profile.module.scss";
 
 interface ProfileProps {
@@ -30,6 +31,7 @@ const MENU = [
 export function Profile({ onNavigate }: ProfileProps) {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const { data: me } = useMe();
+    const { logout } = useAuth();
 
     return (
         <div className={styles["container"]}>
@@ -96,7 +98,7 @@ export function Profile({ onNavigate }: ProfileProps) {
                 cancelLabel="Cancelar"
                 danger
                 onCancel={() => setShowLogoutModal(false)}
-                onConfirm={() => { setShowLogoutModal(false); onNavigate("login"); }}
+                onConfirm={() => { setShowLogoutModal(false); logout(); onNavigate("login"); }}
             />
         </div>
     );
