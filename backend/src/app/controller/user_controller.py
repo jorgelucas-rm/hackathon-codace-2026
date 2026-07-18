@@ -1,9 +1,18 @@
-from fastapi import APIRouter, Body, Depends, Path, Query
+from fastapi import APIRouter, Body, Depends, File, Path, Query, UploadFile
 
 from src.app.controller.dependencies import get_filters, require_roles
-from src.app.model.dto import Pagination, Response, UserCreateDTO, UserReadDTO, UserUpdateDTO
+from src.app.model.dto import (
+    AvatarPresetDTO,
+    AvatarPresetSelectDTO,
+    Pagination,
+    Response,
+    UserCreateDTO,
+    UserReadDTO,
+    UserUpdateDTO,
+)
 from src.app.model.enum import HttpCode, Level
 from src.app.service import UserService
+from src.infra.context import RequestContext
 
 router = APIRouter(prefix="/users", tags=["Users"])
 admin_router = APIRouter(prefix="/users", tags=["Users"])
@@ -22,7 +31,63 @@ async def register_user(
     return Response(
         code=HttpCode.CREATED,
         message="User registered successfully",
-        data=UserReadDTO.model_validate(user),
+        data=service.to_read_dto(user),
+    )
+
+
+@router.get(
+    "/avatars/presets",
+    response_model=Response[list[AvatarPresetDTO]],
+    status_code=HttpCode.OK,
+)
+async def list_avatar_presets(
+    _=Depends(require_roles(Level.ADMIN, Level.USER)),
+    service: UserService = Depends(UserService.get_service),
+):
+    return Response(
+        code=HttpCode.OK,
+        message="Avatar presets retrieved successfully",
+        data=service.list_avatar_presets(),
+    )
+
+
+@router.post(
+    "/me/avatar",
+    response_model=Response[UserReadDTO],
+    status_code=HttpCode.OK,
+)
+async def upload_my_avatar(
+    _=Depends(require_roles(Level.ADMIN, Level.USER)),
+    service: UserService = Depends(UserService.get_service),
+    file: UploadFile = File(...),
+):
+    user = service.upload_avatar(
+        user_id=RequestContext.get_auth_user().user_id, file=file
+    )
+    return Response(
+        code=HttpCode.OK,
+        message="Avatar updated successfully",
+        data=service.to_read_dto(user),
+    )
+
+
+@router.put(
+    "/me/avatar/preset",
+    response_model=Response[UserReadDTO],
+    status_code=HttpCode.OK,
+)
+async def select_my_avatar_preset(
+    _=Depends(require_roles(Level.ADMIN, Level.USER)),
+    service: UserService = Depends(UserService.get_service),
+    dto: AvatarPresetSelectDTO = Body(...),
+):
+    user = service.set_avatar_preset(
+        user_id=RequestContext.get_auth_user().user_id, preset=dto.preset
+    )
+    return Response(
+        code=HttpCode.OK,
+        message="Avatar updated successfully",
+        data=service.to_read_dto(user),
     )
 
 
@@ -67,7 +132,7 @@ async def get_user(
     return Response(
         code=HttpCode.OK,
         message="User retrieved successfully",
-        data=UserReadDTO.model_validate(user),
+        data=service.to_read_dto(user),
     )
 
 
@@ -86,5 +151,5 @@ async def update_user(
     return Response(
         code=HttpCode.OK,
         message="User updated successfully",
-        data=UserReadDTO.model_validate(user),
+        data=service.to_read_dto(user),
     )

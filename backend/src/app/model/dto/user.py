@@ -14,6 +14,7 @@ class UserReadDTO(BaseModel):
     email: EmailStr
     role: serializable_enum(Level)
     situation: bool
+    avatar: Optional[str] = None
 
 
 class UserCreateDTO(BaseModel):
