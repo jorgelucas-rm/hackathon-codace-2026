@@ -4,8 +4,14 @@ from fastapi import Depends, UploadFile
 
 from src.app.adapter import MinioAdapter
 from src.app.model.dto.avatar import AvatarPresetDTO
+from src.app.model.dto.favorite import FavoriteCourtsDTO
 from src.app.model.dto.pagination import Pagination
-from src.app.model.dto.user import UserCreateDTO, UserReadDTO, UserUpdateDTO
+from src.app.model.dto.user import (
+    UserCreateDTO,
+    UserProfileUpdateDTO,
+    UserReadDTO,
+    UserUpdateDTO,
+)
 from src.app.model.entity.user import User
 from src.app.model.enum import ErrorCode, Level
 from src.app.repository.user_repository import UserRepository
@@ -162,6 +168,48 @@ class UserService:
             setattr(user, field, value)
 
         return self.user_repository.save(entity=user)
+
+    def update_profile(self, user_id: int, dto: UserProfileUpdateDTO) -> User:
+        """`PATCH /users/me` — só os campos do próprio perfil. `UserProfileUpdateDTO`
+        não tem `role`/`situation`, então não há como o usuário comum alterá-los
+        por aqui (proteção é o schema, não uma checagem manual)."""
+        user = self.get_by_id(user_id)
+
+        for field, value in dto.model_dump(exclude_unset=True).items():
+            setattr(user, field, value)
+
+        return self.user_repository.save(entity=user)
+
+    def list_favorites(self, user_id: int) -> FavoriteCourtsDTO:
+        user = self.get_by_id(user_id)
+        return FavoriteCourtsDTO(court_ids=list(user.favorite_courts or []))
+
+    def add_favorite(self, user_id: int, court_id: int) -> FavoriteCourtsDTO:
+        """Idempotente: favoritar de novo o mesmo `court_id` não duplica."""
+        user = self.get_by_id(user_id)
+
+        current = list(user.favorite_courts or [])
+        if court_id not in current:
+            current.append(court_id)
+            # Reatribui a lista inteira (em vez de mutar in place) para que o
+            # SQLAlchemy detecte a mudança na coluna JSON e gere o UPDATE.
+            user.favorite_courts = current
+            user = self.user_repository.save(entity=user)
+
+        return FavoriteCourtsDTO(court_ids=list(user.favorite_courts or []))
+
+    def remove_favorite(self, user_id: int, court_id: int) -> FavoriteCourtsDTO:
+        """Idempotente: desfavoritar um `court_id` que nunca foi favoritado não
+        dá erro."""
+        user = self.get_by_id(user_id)
+
+        current = list(user.favorite_courts or [])
+        if court_id in current:
+            current.remove(court_id)
+            user.favorite_courts = current
+            user = self.user_repository.save(entity=user)
+
+        return FavoriteCourtsDTO(court_ids=list(user.favorite_courts or []))
 
     @staticmethod
     def get_service(
