@@ -18,6 +18,7 @@ from src.app.model.entity.court import Court
 from src.app.model.enum import ErrorCode
 from src.app.model.enum.court_status import CourtStatus
 from src.app.repository.company_repository import CompanyRepository
+from src.app.repository.review_repository import ReviewRepository
 from src.infra.exception import ConflictException, NotFoundException
 from src.infra.security import hash_password
 
@@ -39,8 +40,24 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 class CompanyService:
 
-    def __init__(self, company_repository: CompanyRepository):
+    def __init__(
+        self,
+        company_repository: CompanyRepository,
+        review_repository: Optional[ReviewRepository] = None,
+    ):
         self.company_repository = company_repository
+        # Fase F (T-F, extensão aditiva autorizada): opcional para não
+        # quebrar quem já injeta `CompanyService` diretamente (fora do
+        # `get_service`) sem passar esse novo parâmetro.
+        self.review_repository = review_repository
+
+    def _nota_media(self, company_id: int) -> Optional[float]:
+        if self.review_repository is None:
+            return None
+        average, count = self.review_repository.get_average_and_count(company_id)
+        if count == 0 or average is None:
+            return None
+        return round(average, 2)
 
     def get_all_paginated(
         self,
@@ -128,9 +145,7 @@ class CompanyService:
             cover_photo=cover_photo,
             distance_km=round(distance_km, 2) if distance_km is not None else None,
             min_price_hour=min_price_hour,
-            # `nota_media` ainda não existe (sem entidade Review) — placeholder
-            # preenchido na Fase F por outro executor.
-            nota_media=None,
+            nota_media=self._nota_media(company.id),
         )
 
     def search_public(
@@ -201,7 +216,7 @@ class CompanyService:
         return CompanyDetailDTO(
             **CompanyReadDTO.model_validate(company).model_dump(),
             courts=[CourtReadDTO.model_validate(c) for c in active_courts],
-            nota_media=None,
+            nota_media=self._nota_media(company.id),
         )
 
     @staticmethod
@@ -209,5 +224,11 @@ class CompanyService:
         company_repository: CompanyRepository = Depends(
             CompanyRepository.get_instance()
         ),
+        review_repository: ReviewRepository = Depends(
+            ReviewRepository.get_instance()
+        ),
     ) -> "CompanyService":
-        return CompanyService(company_repository=company_repository)
+        return CompanyService(
+            company_repository=company_repository,
+            review_repository=review_repository,
+        )
