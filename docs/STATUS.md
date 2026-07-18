@@ -176,3 +176,75 @@ para todas as ondas seguintes — não deve se repetir.
 (`python run.py`), `/docs` e `/openapi.json` respondem 200, seed de sports
 aparece em `GET /api/sports` (5 esportes), `GET /api/companies` responde
 paginação vazia (sem companies cadastradas ainda no banco dev).
+
+## Onda 2 — Booking + Disponibilidade ∥ Pagamento (contrato + spec)
+
+Onda mais delicada (coração transacional). Contrato B1↔B2 commitado pelo
+orquestrador **antes** de despachar os executores — os dois codificam contra
+isto, nenhum dos dois o altera.
+
+### Contrato B1↔B2 (já commitado)
+
+- **`entity/payment.py`**: `Payment(id, reference_type: str, reference_id:
+  int, amount: int, method: PaymentMethod|None, status: PaymentStatus,
+  company_payout|platform_fee|gateway_fee: int|None, refunded_at:
+  datetime|None, created_at)`. `reference_type` é string livre por design
+  ("booking"/"group_member") — evita acoplar este arquivo compartilhado a um
+  enum fechado que mudaria a cada onda nova.
+- **`enum/payment_method.py`** (`PIX=1, CARD=2`) e **`enum/payment_status.py`**
+  (`PENDING=1, APPROVED=2, DENIED=3, REFUNDED=4`) — arquivos próprios do
+  módulo de payment, não tocam `model/enum/__init__.py`.
+- **`repository/payment_repository.py`**: `PaymentRepository` (herda
+  `BaseRepository`) + `get_by_reference(reference_type, reference_id) ->
+  Payment|None` (pega o pagamento mais recente da referência — usado por
+  T-B1 para achar o payment de um booking pendente e checar TTL).
+- **`dto/payment.py`**: `PaymentSummaryDTO` (forma mínima para embutir
+  referência a um payment fora do módulo — ex.: resposta de `POST
+  /api/bookings`). T-B2 é dono do arquivo e pode adicionar
+  `PaymentReadDTO`/`PaymentConfirmDTO`/etc., mas não remove nem quebra este
+  DTO.
+- **`service/payment_service.py`** (esqueleto — T-B2 completa os corpos):
+  - `PaymentService.create_pending(reference_type: str, reference_id: int,
+    amount: int) -> Payment` — **implementado**: `add()` sem commit (caller
+    finaliza a transação com um único `commit()`).
+  - `PaymentService.is_expired(payment: Payment) -> bool` — **implementado**:
+    TTL (`PAYMENT_TTL_MINUTES`) sobre `created_at`, só relevante para
+    `PENDING`.
+  - `PaymentService.confirm(payment_id: int, result: str, method:
+    PaymentMethod|None) -> Payment` — **T-B2 implementa**: idempotente (já
+    resolvido → retorna estado atual, sem erro, sem reprocessar); na
+    aprovação grava split (`PLATFORM_FEE_PCT`/`GATEWAY_FEE_PCT`) e despacha
+    o efeito registrado para o `reference_type`; commit único no fim.
+  - `PaymentService.refund(payment_id: int) -> Payment` — **T-B2
+    implementa**: `add()` sem commit (caller finaliza a transação).
+  - `register_effect_handler(reference_type: str, on_approved:
+    Callable[[int, Session], None], on_denied: Callable[[int, Session],
+    None]) -> None` — registro de efeitos. Handler recebe `reference_id` e a
+    `Session` corrente (a mesma do payment nesta chamada) para buscar/mutar a
+    entidade dona **na mesma transação**. T-B1 registra `"booking"` no
+    próprio `service/booking_payment_effects.py`; T-C registrará
+    `"group_member"` na Onda 3. Import do módulo de efeitos (para o registro
+    rodar no boot) é aplicado pelo orquestrador em `service/__init__.py`
+    (REGISTRAR pós-merge).
+- **`ErrorCode.PAYMENT_ALREADY_RESOLVED`** (já existe desde a Onda 0) — livre
+  para T-B2 usar onde fizer sentido (ex.: `refund()` chamado sobre pagamento
+  que não está `APPROVED`).
+
+### Task cards da onda
+
+| Task | Escopo | Arquivos que possui | Não toca |
+|---|---|---|---|
+| **T-B1 Booking + Disponibilidade** | `Booking` (court_id, creator_user_id nullable, creator_company_id nullable, date, start_time, end_time, type `closed\|group`, status `pending\|confirmed\|canceled\|completed\|blocked`, reason, total_price, customer_name/customer_phone), `AvailabilityService.generate_slots(...)` pura + `GET /api/courts/{id}/availability?date=`, `POST /api/bookings` (só `type=closed` nesta fase — `type=group` levanta `INVALID_STATE`, gancho para Onda 3) com lock (`SELECT...FOR UPDATE` na court) + sobreposição → `SLOT_UNAVAILABLE`, preço no servidor, expiração preguiçosa via `payment_service.is_expired`, `GET /api/bookings/{id}`, `GET /api/users/me/bookings?scope=upcoming\|history`, `POST /api/bookings/{id}/cancel` com política de reembolso (chama `payment_service.refund` do contrato; parametrizar por ator — user vs. company — com gancho de cascata para grupo na Onda 3) | `entity/booking.py`, `dto/booking.py`, `repository/booking_repository.py`, `service/availability_service.py`, `service/booking_service.py`, `service/booking_payment_effects.py` (handler `"booking"`), `controller/booking_controller.py`, `controller/availability_controller.py`, `model/enum/booking_status.py` (próprio, não tocar `model/enum/__init__.py`), `model/enum/booking_type.py` (próprio), testes próprios | arquivos de payment (usa só `payment_service`/`Payment`/`PaymentSummaryDTO` do contrato; até o merge de T-B2, testa com stub/monkeypatch de `PaymentService.confirm`/`refund`) |
+| **T-B2 Pagamento** | Completar `payment_service.py` (contrato acima), simulador de gateway `POST /api/payments/{id}/confirm` **idempotente**, `GET /api/payments/{id}`, split, estorno, extensão de `dto/payment.py` com os DTOs de leitura/confirmação que faltarem, testes próprios (efeitos testados com handler fake registrado via `register_effect_handler`) | `entity/payment.py` (extensão fina se precisar), `dto/payment.py`, `repository/payment_repository.py`, `service/payment_service.py`, `controller/payment_controller.py`, testes próprios | arquivos de booking |
+
+Regras de exclusividade/TTL/cancelamento: seções 4.1–4.3 do
+`backend-api-e-fluxos.md`; máquinas de estado: seção 5 (Agendamento) e 8
+(Pagamento) do `modelo-de-dominio.md`.
+
+Ordem de merge: **T-B2 → T-B1** → migração única da onda (tabelas `payment`
+e `booking`) → teste de integração da cadeia completa, escrito pelo
+orquestrador: criar booking fechado → confirmar pagamento aprovado →
+booking `confirmed`; pagamento recusado → booking `canceled` e horário
+liberado; pendente expirado (mock de `created_at` no passado) some da
+disponibilidade; corrida de dois bookings no mesmo slot → um leva
+`SLOT_UNAVAILABLE`.
