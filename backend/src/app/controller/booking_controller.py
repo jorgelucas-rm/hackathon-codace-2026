@@ -10,6 +10,7 @@ from src.app.model.dto.booking import (
 )
 from src.app.model.enum import AuthType, HttpCode, Level
 from src.app.service.booking_service import BookingService
+from src.app.service.group_service import GroupService
 from src.infra.context import RequestContext
 
 # Rotas de agendamento próprias (`/bookings`) e aninhadas em
@@ -26,11 +27,29 @@ me_router = APIRouter(prefix="/users/me/bookings", tags=["Bookings"])
 async def create_booking(
     _=Depends(require_roles(Level.USER)),
     service: BookingService = Depends(BookingService.get_service),
+    group_service: GroupService = Depends(GroupService.get_service),
     dto: BookingCreateDTO = Body(...),
 ):
-    booking, payment = service.create_closed_booking(
-        user_id=RequestContext.get_auth_user().user_id, dto=dto
-    )
+    user_id = RequestContext.get_auth_user().user_id
+
+    # T-C (Onda 3, extensão pontual aditiva): ramifica por `dto.type` —
+    # `"group"` chama `GroupService.create_group_booking`, `"closed"`
+    # mantém o caminho existente (T-B1, Onda 2) intocado.
+    if dto.type == "group":
+        booking, _group, _member, payment = group_service.create_group_booking(
+            user_id=user_id, dto=dto
+        )
+        return Response(
+            code=HttpCode.CREATED,
+            message="Group booking created successfully",
+            data=BookingCreateResponseDTO(
+                booking=service.to_read_dto(booking),
+                payment=group_service.payment_service.to_summary_dto(payment),
+                group=group_service.get_panel_summary(booking.id),
+            ),
+        )
+
+    booking, payment = service.create_closed_booking(user_id=user_id, dto=dto)
     return Response(
         code=HttpCode.CREATED,
         message="Booking created successfully",
