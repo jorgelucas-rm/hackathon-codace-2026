@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Screen } from "../../types";
 import { ConfirmModal } from "../../components/ConfirmModal/ConfirmModal";
+import { useMe } from "../../hooks/useMe";
 import styles from "./Profile.module.scss";
 
 interface ProfileProps {
@@ -28,6 +29,7 @@ const MENU = [
 
 export function Profile({ onNavigate }: ProfileProps) {
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const { data: me } = useMe();
 
     return (
         <div className={styles["container"]}>
@@ -43,9 +45,9 @@ export function Profile({ onNavigate }: ProfileProps) {
                     <section className={styles["identity-card"]}>
                         <div className={styles["avatar"]}><User width={40} height={40} /></div>
                         <div className={styles["identity-info"]}>
-                            <h1 className={styles["name"]}>João Silva</h1>
+                            <h1 className={styles["name"]}>{me?.entity?.name ?? "Carregando..."}</h1>
                             <div className={styles["identity-meta"]}>
-                                <span className={styles["level"]}>Nível Avançado</span>
+                                <span className={styles["level"]}>{me?.entity?.skill_level ?? "Nível não definido"}</span>
                                 <span className={styles["place"]}><MapPin width={12} height={12} /> Fortaleza, CE</span>
                             </div>
                         </div>

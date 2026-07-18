@@ -7,6 +7,7 @@ import {
 import { Screen } from "../../types";
 import { getCourtsSync } from "../../services/courts.service";
 import { getOpenMatchesSync } from "../../services/matches.service";
+import { useMe } from "../../hooks/useMe";
 import styles from "./Home.module.scss";
 
 interface HomeProps {
@@ -33,6 +34,8 @@ export function Home({ onNavigate, onSelectCourt, onSearch, dark, toggleDark }: 
     const courts = getCourtsSync();
     const matches = getOpenMatchesSync();
     const recommended = courts.slice(0, 6);
+    const { data: me } = useMe();
+    const firstName = me?.entity?.name?.split(" ")[0] ?? "";
 
     return (
         <div className={styles["container"]}>
@@ -43,7 +46,7 @@ export function Home({ onNavigate, onSelectCourt, onSearch, dark, toggleDark }: 
                     <div className={styles["header-top"]}>
                         <div>
                             <p className={styles["location"]}><MapPin width={13} height={13} /> Fortaleza, CE</p>
-                            <h1 className={styles["greeting"]}>Olá, João <span>👋</span></h1>
+                            <h1 className={styles["greeting"]}>Olá{firstName ? `, ${firstName}` : ""} <span>👋</span></h1>
                         </div>
                         <div className={styles["actions"]}>
                             <button onClick={toggleDark} className={styles["icon-btn"]} aria-label="Alternar tema">

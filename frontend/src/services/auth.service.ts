@@ -37,6 +37,26 @@ export interface CompanySignupData {
     zip_code: string;
 }
 
+export interface UserRead {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    situation: boolean;
+    avatar?: string | null;
+    phone?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    sports_of_interest: number[];
+    favorite_courts: number[];
+    skill_level?: string | null;
+}
+
+export interface MeUserRead {
+    auth_type: string;
+    entity: UserRead | null;
+}
+
 const TOKEN_KEY = "reservae_token";
 
 export function getToken(): string | null {
@@ -59,6 +79,20 @@ async function postJson<T>(url: string, body: unknown, fallbackError: string): P
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+    });
+
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+        throw new Error(json?.message || fallbackError);
+    }
+    return json as Envelope<T>;
+}
+
+async function getJsonAuth<T>(url: string, fallbackError: string): Promise<Envelope<T>> {
+    const token = getToken();
+    const res = await fetch(url, {
+        method: "GET",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
     const json = await res.json().catch(() => null);
@@ -96,8 +130,12 @@ export async function signup(data: SignupData) {
         return { token: "mock-token", user: { name: data.name, email: data.email } };
     }
 
-    // Cadastro de jogador → POST /api/users (UserCreateDTO)
-    return postJson<unknown>("/api/users", data, "Erro ao criar a conta");
+    // Cadastro de jogador → POST /api/users (UserCreateDTO). A rota não
+    // retorna token, então logamos em seguida com as mesmas credenciais
+    // para já deixar o usuário autenticado.
+    const created = await postJson<unknown>("/api/users", data, "Erro ao criar a conta");
+    await login({ email: data.email, password: data.password });
+    return created;
 }
 
 export async function signupCompany(data: CompanySignupData) {
@@ -106,6 +144,15 @@ export async function signupCompany(data: CompanySignupData) {
         return { token: "mock-token", company: { name: data.name, email: data.email } };
     }
 
-    // Cadastro de empresa → POST /api/companies (CompanyCreateDTO)
-    return postJson<unknown>("/api/companies", data, "Erro ao criar a conta");
+    // Cadastro de empresa → POST /api/companies (CompanyCreateDTO). Mesma
+    // situação do signup de jogador: sem token na resposta, então logamos
+    // em seguida com as mesmas credenciais.
+    const created = await postJson<unknown>("/api/companies", data, "Erro ao criar a conta");
+    await loginCompany({ cnpj: data.cnpj, password: data.password });
+    return created;
+}
+
+export async function getMe() {
+    const json = await getJsonAuth<MeUserRead>("/api/auth/me", "Erro ao buscar o usuário atual");
+    return json.data;
 }
