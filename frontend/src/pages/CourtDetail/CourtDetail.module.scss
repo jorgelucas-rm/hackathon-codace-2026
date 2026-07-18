@@ -1,0 +1,605 @@
+@use "../../styles/variables" as *;
+
+// ============================================================
+//  Detalhes da Quadra — vender o local sem virar anúncio
+//  Coeso com Quadras / Home. Capa contida, identidade compacta,
+//  horários como caminho principal para a reserva.
+// ============================================================
+
+.container {
+    min-height: 100vh;
+    padding-bottom: 150px; // espaço p/ CTA fixo + BottomNav
+    background: var(--bg);
+    color: var(--text);
+}
+
+.inner {
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 $spacing-lg;
+}
+
+.eyebrow {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--primary);
+}
+
+// ---------- Capa ----------
+
+.cover {
+    position: relative;
+    height: 232px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cover-icon { color: #fff; opacity: 0.28; }
+
+.cover-fade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.16) 0%, transparent 30%, transparent 60%, var(--bg) 100%);
+}
+
+.cover-btn {
+    position: absolute;
+    top: 18px;
+    width: 40px;
+    height: 40px;
+    z-index: 2;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: rgba(255, 255, 255, 0.9);
+    color: $color-dark;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+    transition: transform 0.15s;
+
+    &:active { transform: scale(0.9); }
+
+    svg { fill: transparent; }
+}
+
+.fav-active {
+    color: #EF4444;
+    svg { fill: #EF4444; }
+}
+
+.cover-premium {
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    background: var(--accent);
+    color: $color-dark;
+}
+
+.cover-dots {
+    position: absolute;
+    bottom: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    display: flex;
+    gap: 6px;
+
+    button {
+        width: 7px;
+        height: 7px;
+        padding: 0;
+        border: none;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.55);
+        cursor: pointer;
+    }
+
+    .dot-active {
+        width: 20px;
+        background: #fff;
+    }
+}
+
+// ---------- Identidade ----------
+
+.identity {
+    position: relative;
+    z-index: 3;
+    margin-top: -26px;
+    padding: 18px;
+    border-radius: $border-radius-xl;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 26px var(--shadow-tint);
+}
+
+.title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+
+    h1 {
+        margin: 0;
+        font-family: $font-display;
+        font-size: 21px;
+        font-weight: 700;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+        color: var(--text);
+    }
+}
+
+.rating-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    background: rgba(173, 153, 0, 0.1);
+
+    svg { color: var(--primary); fill: var(--primary); }
+}
+
+.meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 9px;
+    font-size: 12.5px;
+    color: var(--text-sec);
+}
+
+.place,
+.distance,
+.reviews-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    svg { color: var(--primary); }
+}
+
+.dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--text-sec);
+    opacity: 0.5;
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.tag {
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: var(--bg-secondary);
+    color: var(--text-sec);
+}
+
+.desc {
+    margin: 14px 0 0;
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: var(--text-sec);
+}
+
+// ---------- Seções ----------
+
+.section {
+    margin-top: 26px;
+
+    > h3 {
+        margin: 3px 0 12px;
+        font-family: $font-display;
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--text);
+    }
+}
+
+.section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 12px;
+
+    h3 {
+        margin: 3px 0 0;
+        font-family: $font-display;
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--text);
+    }
+}
+
+.free-pill {
+    flex-shrink: 0;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: rgba(47, 175, 160, 0.12);
+    color: var(--success);
+}
+
+// ---------- Horários hoje ----------
+
+.slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+
+    @media (min-width: 480px) {
+        grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    }
+}
+
+.slot {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 11px 8px;
+    border-radius: $border-radius-md;
+    text-align: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    transition: all 0.15s;
+
+    strong { font-size: 15px; font-weight: 700; color: var(--text); }
+    span { font-size: 11px; color: var(--text-sec); }
+
+    &:not(:disabled):hover { border-color: rgba(173, 153, 0, 0.5); transform: translateY(-2px); }
+    &:not(:disabled):active { transform: scale(0.96); }
+}
+
+.slot-free {
+    border-color: rgba(173, 153, 0, 0.35);
+    background: rgba(173, 153, 0, 0.05);
+
+    strong { color: var(--primary); }
+}
+
+.slot-last {
+    border-color: var(--accent);
+    background: #FFFBEB;
+
+    strong { color: #78600A; }
+    span { color: #96751a; }
+}
+
+.slot-busy {
+    background: var(--bg-secondary);
+    border-color: transparent;
+    opacity: 0.5;
+    cursor: not-allowed;
+
+    strong { color: var(--text-sec); }
+    span { text-decoration: line-through; }
+}
+
+.all-slots {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 0;
+    background: none;
+    border: none;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+// ---------- Estrutura ----------
+
+.amenities {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 9px;
+
+    @media (min-width: 480px) {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+
+.amenity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border-radius: $border-radius-md;
+    background: var(--card);
+    border: 1px solid var(--border);
+}
+
+.amenity-icon {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(173, 153, 0, 0.1);
+    color: var(--primary);
+}
+
+.amenity-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+// ---------- Localização ----------
+
+.loc-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border-radius: $border-radius-lg;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px var(--shadow-tint);
+}
+
+.loc-map {
+    width: 76px;
+    height: 76px;
+    flex-shrink: 0;
+    border-radius: $border-radius-md;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+    color: var(--primary);
+}
+
+.loc-info {
+    min-width: 0;
+}
+
+.loc-name {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.loc-addr {
+    display: block;
+    margin-top: 3px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-sec);
+}
+
+.loc-dist {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+// ---------- Avaliações ----------
+
+.rating-summary {
+    display: flex;
+    gap: 18px;
+    padding: 16px;
+    border-radius: $border-radius-lg;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px var(--shadow-tint);
+}
+
+.rating-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding-right: 18px;
+    border-right: 1px solid var(--border);
+
+    p {
+        margin: 0;
+        font-size: 34px;
+        font-weight: 800;
+        line-height: 1;
+        color: var(--text);
+    }
+
+    span { font-size: 11px; color: var(--text-sec); }
+}
+
+.rating-bars {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    justify-content: center;
+}
+
+.rating-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-sec);
+
+    > span:first-child { width: 8px; font-weight: 600; }
+}
+
+.bar-track {
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--bg-secondary);
+
+    > div { height: 100%; border-radius: 999px; background: var(--primary); }
+}
+
+.bar-value { width: 26px; text-align: right; }
+
+.reviews {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.review {
+    padding: 14px;
+    border-radius: $border-radius-lg;
+    background: var(--card);
+    border: 1px solid var(--border);
+}
+
+.review-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 9px;
+
+    > span { margin-left: auto; font-size: 11px; color: var(--text-sec); }
+}
+
+.review-avatar {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--bg-secondary);
+    color: var(--text);
+}
+
+.review-id {
+    p { margin: 0 0 2px; font-size: 13.5px; font-weight: 700; color: var(--text); }
+}
+
+.review-text {
+    margin: 0 0 10px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-sec);
+}
+
+.review-useful {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-sec);
+}
+
+.more-reviews {
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: $border-radius-md;
+    background: var(--card);
+    border: 1px solid var(--border);
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--primary);
+    transition: border-color 0.18s;
+
+    &:hover { border-color: rgba(173, 153, 0, 0.4); }
+}
+
+// ---------- CTA fixo ----------
+
+.cta-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 64px; // acima do BottomNav
+    z-index: 45;
+    padding: 12px 0;
+    background: color-mix(in srgb, var(--card) 96%, transparent);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--border);
+}
+
+.cta-inner {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 0 $spacing-lg;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.cta-price {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex-shrink: 0;
+
+    span { font-size: 11px; color: var(--text-sec); }
+    strong { font-size: 18px; font-weight: 800; color: var(--primary); }
+}
+
+.cta-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 50px;
+    border: none;
+    border-radius: $border-radius-md;
+    background: var(--cta);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: 0 8px 22px rgba(173, 153, 0, 0.32);
+    transition: transform 0.15s;
+
+    &:active { transform: scale(0.98); }
+
+    @media (min-width: 640px) {
+        flex: none;
+        min-width: 280px;
+        margin-left: auto;
+    }
+}

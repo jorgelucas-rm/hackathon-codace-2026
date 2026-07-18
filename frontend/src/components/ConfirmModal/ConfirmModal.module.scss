@@ -1,0 +1,113 @@
+@use "../../styles/variables" as *;
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-lg;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+    animation: fade-in 0.15s ease-out;
+}
+
+.modal {
+    width: 100%;
+    max-width: 340px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: $spacing-lg;
+    border-radius: $border-radius-xl;
+    background: var(--card);
+    border: $border-default;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+    animation: pop-in 0.2s ease-out;
+}
+
+.icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: $spacing-md;
+    background: rgba(173, 153, 0, 0.12);
+    color: var(--primary);
+}
+
+.icon-danger {
+    background: #FEE2E2;
+    color: $color-danger;
+}
+
+.title {
+    margin: 0 0 8px;
+    font-family: $font-display;
+    font-weight: 700;
+    font-size: $font-size-lg;
+    color: var(--text);
+}
+
+.message {
+    margin: 0 0 $spacing-lg;
+    font-size: $font-size-sm;
+    line-height: 1.6;
+    color: var(--text-sec);
+}
+
+.actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $spacing-sm;
+}
+
+.cancel {
+    padding: 12px 0;
+    border-radius: $border-radius-md;
+    font-size: $font-size-sm;
+    font-weight: 700;
+    background: var(--bg);
+    border: $border-default;
+    color: var(--text);
+}
+
+.confirm {
+    padding: 12px 0;
+    border-radius: $border-radius-md;
+    font-size: $font-size-sm;
+    font-weight: 700;
+    border: none;
+    background: var(--cta);
+    color: #fff;
+    transition: transform 0.15s;
+
+    &:active {
+        transform: scale(0.96);
+    }
+}
+
+.confirm-danger {
+    background: $color-danger;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes pop-in {
+    from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

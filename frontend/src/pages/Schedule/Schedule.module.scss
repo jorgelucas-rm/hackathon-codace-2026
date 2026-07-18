@@ -1,0 +1,504 @@
+@use "../../styles/variables" as *;
+
+// ============================================================
+//  Escolher horário — foco em uma tarefa: data + horário
+//  Coeso com Home / Match / Quadras. Verde ausente; dourado
+//  para seleção e ações. Desktop: coluna + resumo lateral.
+// ============================================================
+
+.container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--text);
+
+    // Desktop: página não rola; só a coluna de horários. Resumo lateral
+    // fixo. Desconta a altura do BottomNav (64px) para nada ficar coberto.
+    @media (min-width: 1024px) {
+        flex-direction: row;
+        height: calc(100vh - 64px);
+        overflow: hidden;
+    }
+}
+
+.main {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+}
+
+.eyebrow {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--primary);
+}
+
+// ---------- Header ----------
+
+.header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px $spacing-lg 16px;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+
+    h1 {
+        margin: 2px 0 0;
+        font-family: $font-display;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--text);
+    }
+}
+
+.back {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    transition: transform 0.15s;
+
+    &:active { transform: scale(0.92); }
+}
+
+.content {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 18px $spacing-lg 0;
+}
+
+// ---------- Resumo compacto da quadra ----------
+
+.court-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: $border-radius-lg;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px var(--shadow-tint);
+}
+
+.court-thumb {
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+    border-radius: $border-radius-md;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+}
+
+.court-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.court-name {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.court-place {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 2px 0 6px;
+    font-size: 12px;
+    color: var(--text-sec);
+
+    svg { color: var(--primary); }
+}
+
+.court-sport {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--bg-secondary);
+    color: var(--text-sec);
+}
+
+.court-price {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    flex-shrink: 0;
+    text-align: right;
+
+    strong {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--primary);
+    }
+}
+
+// ---------- Blocos ----------
+
+.block {
+    margin-top: 22px;
+}
+
+.block-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 10px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-sec);
+
+    svg { color: var(--primary); }
+}
+
+// ---------- Datas ----------
+
+.days {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.day {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    min-width: 60px;
+    padding: 10px 12px;
+    border-radius: $border-radius-md;
+    background: var(--card);
+    color: var(--text-sec);
+    border: 1px solid var(--border);
+    transition: all 0.18s;
+
+    &:hover { border-color: rgba(173, 153, 0, 0.4); }
+
+    span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    strong { font-size: 18px; font-weight: 700; color: var(--text); }
+}
+
+.day-active {
+    background: var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(173, 153, 0, 0.28);
+
+    span, strong { color: #fff; }
+}
+
+// ---------- Tipo de reserva ----------
+
+.types {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.type {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    padding: 13px 14px;
+    border-radius: $border-radius-md;
+    text-align: left;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text-sec);
+    transition: all 0.18s;
+
+    svg { color: var(--text-sec); margin-bottom: 3px; }
+}
+
+.type-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.type-desc {
+    font-size: 12px;
+    color: var(--text-sec);
+}
+
+.type-active {
+    border-color: var(--primary);
+    background: rgba(173, 153, 0, 0.06);
+
+    svg { color: var(--primary); }
+}
+
+// ---------- Horários ----------
+
+.slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+
+    @media (min-width: 420px) {
+        grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    }
+}
+
+.slot {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 11px 12px;
+    border-radius: $border-radius-md;
+    text-align: left;
+    background: var(--card);
+    border: 1px solid var(--border);
+    transition: all 0.15s;
+
+    &:not(:disabled):hover { border-color: rgba(173, 153, 0, 0.5); }
+    &:not(:disabled):active { transform: scale(0.96); }
+}
+
+.slot-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    strong { font-size: 15px; font-weight: 700; color: var(--text); }
+}
+
+.slot-price {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-sec);
+}
+
+.slot-free {
+    // aparência neutra para disponível
+}
+
+.slot-last {
+    border-color: var(--accent);
+}
+
+.slot-busy {
+    background: var(--bg-secondary);
+    border-color: transparent;
+    opacity: 0.45;
+    cursor: not-allowed;
+
+    strong { color: var(--text-sec); }
+}
+
+.slot-selected {
+    background: var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 6px 16px rgba(173, 153, 0, 0.3);
+
+    .slot-head strong,
+    .slot-head svg,
+    .slot-price { color: #fff; }
+}
+
+.tag-last {
+    font-style: normal;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #78600A;
+}
+
+.tag-busy {
+    font-style: normal;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text-sec);
+}
+
+.spacer {
+    height: 120px;
+
+    @media (min-width: 1024px) { height: $spacing-lg; }
+}
+
+// ---------- CTA compartilhado ----------
+
+.cta {
+    width: 100%;
+    height: 50px;
+    border: none;
+    border-radius: $border-radius-md;
+    background: var(--cta);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: 0 8px 22px rgba(173, 153, 0, 0.32);
+    transition: transform 0.15s, opacity 0.2s;
+
+    &:active { transform: scale(0.98); }
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+}
+
+// ---------- Resumo lateral (desktop) ----------
+
+.summary {
+    display: none;
+
+    @media (min-width: 1024px) {
+        display: flex;
+        flex-direction: column;
+        width: 340px;
+        flex-shrink: 0;
+        height: calc(100vh - 64px);
+        background: var(--card);
+        border-left: 1px solid var(--border);
+    }
+}
+
+.summary-head {
+    padding: 22px $spacing-lg 16px;
+    border-bottom: 1px solid var(--border);
+
+    h2 {
+        margin: 3px 0 0;
+        font-family: $font-display;
+        font-size: 19px;
+        font-weight: 700;
+        color: var(--text);
+    }
+}
+
+.summary-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px $spacing-lg;
+}
+
+.summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    font-size: 13.5px;
+
+    span {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--text-sec);
+
+        svg { color: var(--primary); }
+    }
+
+    strong {
+        font-weight: 700;
+        color: var(--text);
+        text-align: right;
+    }
+}
+
+.summary-divider {
+    height: 1px;
+    margin: 12px 0;
+    background: var(--border);
+}
+
+.summary-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 13.5px;
+    color: var(--text-sec);
+}
+
+.summary-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+
+    span { font-size: 15px; font-weight: 700; color: var(--text); }
+    strong { font-size: 20px; font-weight: 800; color: var(--primary); }
+}
+
+.summary-foot {
+    padding: $spacing-lg;
+    border-top: 1px solid var(--border);
+}
+
+// ---------- Barra fixa (mobile) ----------
+
+.mobile-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 64px; // acima do BottomNav
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px $spacing-lg;
+    background: color-mix(in srgb, var(--card) 96%, transparent);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--border);
+
+    .cta {
+        width: auto;
+        flex: 1;
+        max-width: 220px;
+        height: 48px;
+    }
+
+    @media (min-width: 1024px) { display: none; }
+}
+
+.mobile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+}
+
+.mobile-label {
+    font-size: 12px;
+    color: var(--text-sec);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mobile-total {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--primary);
+}
