@@ -11,7 +11,7 @@ orquestrador conforme `docs/prompt-orquestrador.md`. Branch de integração:
 | 0 | Fundação (constantes, ErrorCodes, transação, tests/conftest.py) | ✅ concluída |
 | 1 | T-A1 Catálogo ∥ T-A2 Perfil+Favoritos | ✅ concluída |
 | 2 | T-B1 Booking+Disponibilidade ∥ T-B2 Pagamento | ✅ concluída |
-| 3 | T-C Grupos ∥ T-D Painel | ⏳ pendente |
+| 3 | T-C Grupos ∥ T-D Painel | ⏳ em andamento |
 | 4 | T-E Notif+Job ∥ T-F Reviews+Seed | ⏳ pendente |
 
 ## Matriz-resumo de propriedade
@@ -292,3 +292,77 @@ ok. Rotas novas confirmadas no `openapi.json`: `/api/bookings`,
 `/api/bookings/{id}`, `/api/bookings/{id}/cancel`, `/api/users/me/bookings`,
 `/api/courts/{id}/availability`, `/api/payments/{id}`,
 `/api/payments/{id}/confirm`.
+
+## Onda 3 — Grupos ∥ Painel (contrato + spec)
+
+Contrato T-C↔T-D commitado antes de despachar, no mesmo espírito da Onda 2:
+como `group_service` só é consumido por T-D em dois pontos, o esqueleto é
+enxuto (duas assinaturas + os DTOs/entidades que sustentam o schema), mas
+precisa existir **antes** dos dois branches divergirem — do contrário T-D
+não teria nem o módulo para importar/stubar.
+
+### Contrato T-C↔T-D (já commitado)
+
+- **`entity/open_group.py`** (`OpenGroup`) e **`entity/group_member.py`**
+  (`GroupMember`) — campos conforme `modelo-de-dominio.md` §6-7, traduzidos
+  (decisão #3 do `prompt.md`). `GroupMemberStatus` ganhou um terceiro valor
+  (`PENDING`) além dos dois do modelo de domínio (`CONFIRMED`/`LEFT`) — é o
+  mesmo padrão já usado em `BookingStatus.PENDING`, necessário pra contagem
+  "confirmados + pendentes válidos" (`backend-api-e-fluxos.md` §3.3) sem
+  inventar um enum incompatível com o domínio.
+- **`enum/group_status.py`**, **`enum/group_visibility.py`**,
+  **`enum/group_leftover_rule.py`**, **`enum/group_member_status.py`** —
+  arquivos próprios, não tocam `model/enum/__init__.py`.
+- **`repository/group_repository.py`**: `GroupRepository` (herda
+  `BaseRepository`) + `get_by_booking(booking_id) -> OpenGroup|None`.
+- **`dto/group.py`**: `GroupCreateDTO` (payload do grupo embutido em `POST
+  /api/bookings`) e `GroupPanelSummaryDTO` (retorno de
+  `get_panel_summary`, forma que T-D embute na agenda e T-C reaproveita no
+  slot `open_group` da disponibilidade).
+- **`service/group_service.py`** (esqueleto — T-C completa os corpos, pode
+  reescrever `__init__`/`get_service` à vontade, só não quebra as
+  assinaturas públicas):
+  - `GroupService.get_panel_summary(booking_id: int) ->
+    GroupPanelSummaryDTO | None` — **T-C implementa**. É todo o
+    conhecimento que T-D precisa do domínio de grupo (nunca importa
+    `OpenGroup`/`GroupMember` diretamente).
+  - `GroupService.cancel_group(group_id: int, reason: str, commit: bool =
+    True) -> None` — **T-C implementa**: estorna cotas aprovadas, marca
+    grupo e booking como `CANCELED`. `commit=False` para compor dentro de
+    uma transação maior já aberta pelo caller.
+
+### Extensão pontual autorizada em arquivos de T-B1 (Onda 2, já fechada)
+
+Como no plano original, T-C precisa ligar a criação de grupo ao fluxo de
+booking — e Onda 2 já mergeou e fechou. Não há conflito de paralelismo
+(T-D não toca nesses arquivos), então **T-C tem autorização pontual e
+aditiva** (não remover/quebrar o caminho `type=closed` existente, suíte
+inteira de T-B1 tem que continuar verde) para estender:
+
+- `model/dto/booking.py`: adicionar `group: Optional[GroupCreateDTO] =
+  None` em `BookingCreateDTO`.
+- `controller/booking_controller.py`: em `create_booking`, ramificar por
+  `dto.type` — `"group"` chama o novo método de `GroupService` (T-C decide o
+  nome, ex. `create_group_booking`), `"closed"` mantém a chamada atual a
+  `BookingService.create_closed_booking`.
+- `service/availability_service.py`: popular o slot `open_group` (usando
+  `AvailabilityGroupDTO`, já existente em `dto/booking.py`) quando o
+  booking sobreposto for `type=GROUP` com grupo `OPEN`+`PUBLIC` — hoje o
+  slot só alterna `free`/`busy`.
+
+### Task cards da onda
+
+| Task | Escopo | Arquivos que possui | Não toca |
+|---|---|---|---|
+| **T-C Grupos** | Fase C inteira (`docs/prompt.md`): `POST /api/bookings` com `type=group` cria booking+group+member do criador+payment da cota (`reference_type="group_member"`) na mesma transação (`total_spots ≤ capacity`, `min_spots ≤ total_spots`, cota = `ceil(total/spots)`); `GET /api/groups` (busca pública, só `open`+`public` com prazo futuro), `GET /api/groups/{id}` (funciona para `link`), `POST /api/groups/{id}/join` (lock do grupo, `GROUP_FULL`/`ALREADY_MEMBER`), `POST /api/groups/{id}/leave` (reembolso conforme prazo, vaga reabre); handler `"group_member"` no registro de efeitos de payment (aprovado → membro `CONFIRMED`, se lotou → grupo `FULL` + booking `CONFIRMED`); `GroupService.process_deadline(group)` idempotente (mínimo OK → `CONFIRMED`; senão → `CANCELED` via `cancel_group`); slot `open_group` na disponibilidade | `entity/open_group.py`, `entity/group_member.py` (contrato, pode estender), `dto/group.py` (contrato, pode estender), `repository/group_repository.py` (contrato, pode estender), `repository/group_member_repository.py` (novo), `service/group_service.py` (contrato, completa os corpos), `service/group_payment_effects.py` (novo, handler `"group_member"`), `controller/group_controller.py` (novo), testes próprios, **+ extensão pontual aditiva** em `model/dto/booking.py`, `controller/booking_controller.py`, `service/availability_service.py` (ver seção acima) | `service/booking_service.py`, `service/payment_service.py` (usa só os hooks/contrato); arquivos do painel (`company_schedule_*`, `booking_admin_service.py`) |
+| **T-D Painel** | Fase D inteira: `GET /api/companies/me/schedule?date=` (grade do dia de todas as courts com bookings ativos; embute cliente — `creator_user_id`/`customer_name`+`customer_phone` — e, se `type=GROUP`, `group_service.get_panel_summary(booking.id)`); bloqueios `POST /api/courts/{id}/blocks` (booking `BLOCKED`+`reason`, mesma validação de exclusividade — lock+overlap reimplementados aqui via os métodos públicos de `BookingRepository`, sem editar `booking_service.py`) e `DELETE /api/bookings/{id}/block`; reserva manual `POST /api/companies/me/manual-bookings` (nasce `CONFIRMED`, sem payment, `customer_name`/`customer_phone` livres, mesma exclusividade); cancelamento pelo estabelecimento reaproveitando `BookingService.cancel_by_company` (já existe, Onda 2) + cascata: se `booking.type==GROUP`, chama `group_service.cancel_group(group_id, reason="canceled_by_company")` (o `group_id` vem do `.id` de `get_panel_summary`); `GET /api/companies/me/report?from=&to=` (ocupação, receita confirmada, picos) | `service/company_schedule_service.py`, `controller/company_schedule_controller.py`, `service/booking_admin_service.py` (bloqueios/manual/cancelamento — arquivo próprio, não é `booking_service.py`), testes próprios | `service/group_service.py`/entidades de grupo (usa só `get_panel_summary`/`cancel_group` do contrato; até o merge de T-C, testa com stub/monkeypatch), `service/booking_service.py` (só chama `cancel_by_company`, não edita) |
+
+Regras: seções 2.7 (rotas de grupo), 3.3/3.4 (fluxos de entrada/fechamento
+por prazo), 3.6 (painel) do `backend-api-e-fluxos.md`; máquinas de estado
+do Grupo/Participante: `modelo-de-dominio.md` §6-7.
+
+Ordem de merge: **T-C → T-D** → migração única da onda (`open_group`,
+`group_member`) → teste de integração da cascata, escrito pelo
+orquestrador: criar grupo → segundo user entra e paga cota → grupo lota →
+booking `confirmed`; cancelamento pelo estabelecimento de um booking com
+grupo real estorna todas as cotas aprovadas e libera o horário.
