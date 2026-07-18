@@ -22,15 +22,15 @@ AVATAR_OBJECT_PREFIX = "avatar/"
 # Avatares fixos (nossos) vivem no mesmo prefixo que os uploads dos usuários,
 # para não exigir um fluxo de busca/listagem separado no bucket.
 AVATAR_PRESET_FILENAMES = [
-    "default.png",
-    "preset-1.png",
-    "preset-2.png",
-    "preset-3.png",
-    "preset-4.png",
-    "preset-5.png",
+    "avatar_00.svg",
+    "avatar_1.svg",
+    "avatar_2.svg",
+    "avatar_3.svg",
+    "avatar_4.svg",
+    "avatar_5.svg",
 ]
 AVATAR_PRESET_KEYS = {f"{AVATAR_OBJECT_PREFIX}{name}" for name in AVATAR_PRESET_FILENAMES}
-DEFAULT_AVATAR = f"{AVATAR_OBJECT_PREFIX}default.png"
+DEFAULT_AVATAR = f"{AVATAR_OBJECT_PREFIX}avatar_00.svg"
 MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024
 ALLOWED_AVATAR_CONTENT_TYPES = {
     "image/png": ".png",

@@ -27,7 +27,7 @@ class User(BaseModel):
     )
     avatar: Mapped[str] = mapped_column(
         String(500),
-        server_default=text("'avatar/default.png'"),
+        server_default=text("'avatar/avatar_00.svg'"),
         nullable=False,
     )
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
