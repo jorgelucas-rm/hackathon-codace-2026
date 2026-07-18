@@ -217,11 +217,6 @@ function AppShell() {
                     <Route path="/panel/:tab" element={<CompanyPanelRoute />} />
                 </Route>
 
-                <Route element={<CompanyProtectedRoute />}>
-                    <Route path="/panel" element={<Navigate to="/panel/agenda" replace />} />
-                    <Route path="/panel/:tab" element={<CompanyPanelRoute />} />
-                </Route>
-
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             {showNav && <BottomNav active={pathToScreen(location.pathname)} onNavigate={onNavigate} />}
