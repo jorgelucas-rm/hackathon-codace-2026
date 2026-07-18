@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { ChevronLeft, Heart, MapPin, Trophy, Star, ThumbsUp, Navigation, Car, Wifi, Coffee, Dumbbell, ArrowRight } from "lucide-react";
+import { ChevronLeft, Heart, MapPin, Trophy, Star, ThumbsUp, Car, Wifi, Coffee, Dumbbell, ArrowRight, Loader2 } from "lucide-react";
 import { Screen } from "../../types";
 import { StarRow } from "../../components/StarRow/StarRow";
-import { getCourtById } from "../../services/courts.service";
+import { formatPriceCents } from "../../services/companies.service";
+import { useCompanyDetail, useCompanyReviews } from "./hooks/useCourtDetail";
 import styles from "./CourtDetail.module.scss";
 
 interface CourtDetailProps {
@@ -18,27 +19,70 @@ function amenityIcon(name: string) {
     return <Dumbbell width={17} height={17} />;
 }
 
+function initialsOf(name: string | null): string {
+    if (!name) return "?";
+    const parts = name.trim().split(/\s+/);
+    const first = parts[0]?.[0] ?? "";
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+    return (first + last).toUpperCase();
+}
+
 export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
-    const court = getCourtById(courtId);
+    const { data: company, isLoading, isError } = useCompanyDetail(courtId);
+    const { data: reviewsPage } = useCompanyReviews(courtId);
     const [photoSlide, setPhotoSlide] = useState(0);
     const [fav, setFav] = useState(false);
     const [showAllReviews, setShowAllReviews] = useState(false);
 
-    const ratingDist = [
-        { label: "5", value: Math.round(court.reviewCount * 0.6) },
-        { label: "4", value: Math.round(court.reviewCount * 0.25) },
-        { label: "3", value: Math.round(court.reviewCount * 0.1) },
-        { label: "2", value: Math.round(court.reviewCount * 0.03) },
-        { label: "1", value: Math.round(court.reviewCount * 0.02) },
-    ];
-    const visibleReviews = showAllReviews ? court.reviews : court.reviews.slice(0, 2);
-    const freeToday = court.todaySlots.filter((s) => s.status === "disponivel" || s.status === "ultimas").length;
+    if (isLoading) {
+        return (
+            <div className={styles["container"]}>
+                <div className={styles["inner"]} style={{ padding: "64px 0", textAlign: "center" }}>
+                    <Loader2 width={36} height={36} />
+                    <p>Carregando arena...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (isError || !company) {
+        return (
+            <div className={styles["container"]}>
+                <div className={styles["inner"]} style={{ padding: "64px 0", textAlign: "center" }}>
+                    <p>Não foi possível carregar essa arena.</p>
+                    <button onClick={() => onNavigate("courts")}>Voltar</button>
+                </div>
+            </div>
+        );
+    }
+
+    const reviews = reviewsPage?.items ?? [];
+    const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 2);
+    const ratingCounts = [5, 4, 3, 2, 1].map((star) => ({
+        label: String(star),
+        value: reviews.filter((r) => r.rating === star).length,
+    }));
+
+    const sportTags = Array.from(
+        new Set(company.courts.flatMap((c) => c.sports.map((s) => s.name)))
+    );
+    const activeCourts = company.courts.filter((c) => c.status === "ACTIVE");
+    const cheapestCourt = activeCourts.length
+        ? Math.min(...activeCourts.map((c) => c.base_price_hour))
+        : null;
+    const coverPhoto = company.photos[photoSlide] ?? company.photos[0] ?? null;
+    const addressLine = `${company.street}, ${company.number} · ${company.neighborhood}`;
 
     return (
         <div className={styles["container"]}>
             {/* ---------- Capa (contida, não domina) ---------- */}
-            <div className={styles["cover"]} style={{ background: court.gradient }}>
-                <Trophy width={72} height={72} className={styles["cover-icon"]} />
+            <div
+                className={styles["cover"]}
+                style={coverPhoto
+                    ? { backgroundImage: `url(${coverPhoto})`, backgroundSize: "cover", backgroundPosition: "center" }
+                    : { background: "linear-gradient(135deg, rgba(173,153,0,0.2), #E8D7BD)" }}
+            >
+                {!coverPhoto && <Trophy width={72} height={72} className={styles["cover-icon"]} />}
                 <div className={styles["cover-fade"]} />
                 <button onClick={() => onNavigate("courts")} className={styles["cover-btn"]} style={{ left: 16 }} aria-label="Voltar">
                     <ChevronLeft width={20} height={20} />
@@ -51,82 +95,82 @@ export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
                 >
                     <Heart width={20} height={20} />
                 </button>
-                {court.premium && <span className={styles["cover-premium"]}>PREMIUM</span>}
-                <div className={styles["cover-dots"]}>
-                    {[0, 1, 2].map((i) => (
-                        <button
-                            key={i}
-                            onClick={() => setPhotoSlide(i)}
-                            className={i === photoSlide ? styles["dot-active"] : ""}
-                            aria-label={`Foto ${i + 1}`}
-                        />
-                    ))}
-                </div>
+                {company.photos.length > 1 && (
+                    <div className={styles["cover-dots"]}>
+                        {company.photos.slice(0, 3).map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setPhotoSlide(i)}
+                                className={i === photoSlide ? styles["dot-active"] : ""}
+                                aria-label={`Foto ${i + 1}`}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
 
             <main className={styles["inner"]}>
-                {/* ---------- Identidade da quadra (compacta, escaneável) ---------- */}
+                {/* ---------- Identidade da arena (compacta, escaneável) ---------- */}
                 <section className={styles["identity"]}>
                     <div className={styles["title-row"]}>
-                        <h1>{court.name}</h1>
-                        <span className={styles["rating-badge"]}><Star width={14} height={14} /> {court.rating}</span>
+                        <h1>{company.name}</h1>
+                        <span className={styles["rating-badge"]}>
+                            <Star width={14} height={14} />
+                            {company.nota_media !== null ? company.nota_media.toFixed(1) : "novo"}
+                        </span>
                     </div>
                     <div className={styles["meta"]}>
-                        <span className={styles["place"]}><MapPin width={13} height={13} /> {court.neighborhood.split(",")[0]}</span>
+                        <span className={styles["place"]}><MapPin width={13} height={13} /> {company.neighborhood}, {company.city}</span>
                         <span className={styles["dot"]} />
-                        <span className={styles["distance"]}><Navigation width={12} height={12} /> {court.distance}</span>
-                        <span className={styles["dot"]} />
-                        <span className={styles["reviews-count"]}>{court.reviewCount} avaliações</span>
+                        <span className={styles["reviews-count"]}>{reviewsPage?.total_filtered ?? 0} avaliações</span>
                     </div>
                     <div className={styles["tags"]}>
-                        {court.sportTags.map((tag) => <span key={tag} className={styles["tag"]}>{tag}</span>)}
+                        {sportTags.map((tag) => <span key={tag} className={styles["tag"]}>{tag}</span>)}
                     </div>
-                    <p className={styles["desc"]}>{court.desc}</p>
+                    {company.description && <p className={styles["desc"]}>{company.description}</p>}
                 </section>
 
-                {/* ---------- Horários hoje (caminho principal p/ reserva) ---------- */}
+                {/* ---------- Quadras da arena ---------- */}
                 <section className={styles["section"]}>
                     <div className={styles["section-head"]}>
                         <div>
-                            <span className={styles["eyebrow"]}>Disponibilidade</span>
-                            <h3>Horários de hoje</h3>
+                            <span className={styles["eyebrow"]}>Estrutura</span>
+                            <h3>Quadras</h3>
                         </div>
-                        <span className={styles["free-pill"]}>{freeToday} livres</span>
+                        <span className={styles["free-pill"]}>{activeCourts.length} ativas</span>
                     </div>
                     <div className={styles["slots"]}>
-                        {court.todaySlots.map((slot) => {
-                            const isDisabled = slot.status === "reservado" || slot.status === "privada";
-                            return (
-                                <button
-                                    key={slot.time}
-                                    onClick={() => !isDisabled && onNavigate("schedule")}
-                                    disabled={isDisabled}
-                                    className={`${styles["slot"]} ${isDisabled ? styles["slot-busy"] : slot.status === "ultimas" ? styles["slot-last"] : styles["slot-free"]}`}
-                                >
-                                    <strong>{slot.time}</strong>
-                                    <span>{isDisabled ? "ocupado" : `${slot.spots} vaga${slot.spots !== 1 ? "s" : ""}`}</span>
-                                </button>
-                            );
-                        })}
+                        {company.courts.map((court) => (
+                            <button
+                                key={court.id}
+                                onClick={() => onNavigate("schedule")}
+                                className={`${styles["slot"]} ${styles["slot-free"]}`}
+                            >
+                                <strong>{court.name}</strong>
+                                <span>{court.sports.map((s) => s.name).join(", ") || "—"} · {formatPriceCents(court.base_price_hour)}/h</span>
+                            </button>
+                        ))}
                     </div>
                     <button onClick={() => onNavigate("schedule")} className={styles["all-slots"]}>
                         Ver agenda completa <ArrowRight width={15} height={15} />
                     </button>
                 </section>
 
-                {/* ---------- Estrutura / comodidades ---------- */}
-                <section className={styles["section"]}>
-                    <span className={styles["eyebrow"]}>O que oferece</span>
-                    <h3>Estrutura</h3>
-                    <div className={styles["amenities"]}>
-                        {court.amenities.map((a) => (
-                            <div key={a} className={styles["amenity"]}>
-                                <span className={styles["amenity-icon"]}>{amenityIcon(a)}</span>
-                                <span className={styles["amenity-label"]}>{a}</span>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                {/* ---------- Comodidades ---------- */}
+                {company.amenities.length > 0 && (
+                    <section className={styles["section"]}>
+                        <span className={styles["eyebrow"]}>O que oferece</span>
+                        <h3>Comodidades</h3>
+                        <div className={styles["amenities"]}>
+                            {company.amenities.map((a) => (
+                                <div key={a} className={styles["amenity"]}>
+                                    <span className={styles["amenity-icon"]}>{amenityIcon(a)}</span>
+                                    <span className={styles["amenity-label"]}>{a}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
 
                 {/* ---------- Localização (compacta) ---------- */}
                 <section className={styles["section"]}>
@@ -135,9 +179,8 @@ export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
                     <div className={styles["loc-card"]}>
                         <div className={styles["loc-map"]}><MapPin width={26} height={26} /></div>
                         <div className={styles["loc-info"]}>
-                            <p className={styles["loc-name"]}>{court.neighborhood}</p>
-                            <span className={styles["loc-addr"]}>{court.address}</span>
-                            <span className={styles["loc-dist"]}><Navigation width={12} height={12} /> {court.distance} de você</span>
+                            <p className={styles["loc-name"]}>{company.neighborhood}</p>
+                            <span className={styles["loc-addr"]}>{addressLine}</span>
                         </div>
                     </div>
                 </section>
@@ -148,42 +191,50 @@ export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
                     <h3>Avaliações</h3>
                     <div className={styles["rating-summary"]}>
                         <div className={styles["rating-score"]}>
-                            <p>{court.rating}</p>
-                            <StarRow rating={Math.round(court.rating)} size="md" />
-                            <span>{court.reviewCount} avaliações</span>
+                            <p>{company.nota_media !== null ? company.nota_media.toFixed(1) : "—"}</p>
+                            <StarRow rating={Math.round(company.nota_media ?? 0)} size="md" />
+                            <span>{reviewsPage?.total_filtered ?? 0} avaliações</span>
                         </div>
-                        <div className={styles["rating-bars"]}>
-                            {ratingDist.map((row) => (
-                                <div key={row.label} className={styles["rating-bar"]}>
-                                    <span>{row.label}</span>
-                                    <div className={styles["bar-track"]}>
-                                        <div style={{ width: `${Math.round((row.value / court.reviewCount) * 100)}%` }} />
+                        {reviews.length > 0 && (
+                            <div className={styles["rating-bars"]}>
+                                {ratingCounts.map((row) => (
+                                    <div key={row.label} className={styles["rating-bar"]}>
+                                        <span>{row.label}</span>
+                                        <div className={styles["bar-track"]}>
+                                            <div style={{ width: `${Math.round((row.value / reviews.length) * 100)}%` }} />
+                                        </div>
+                                        <span className={styles["bar-value"]}>{row.value}</span>
                                     </div>
-                                    <span className={styles["bar-value"]}>{row.value}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className={styles["reviews"]}>
-                        {visibleReviews.map((review, i) => (
-                            <div key={i} className={styles["review"]}>
-                                <div className={styles["review-head"]}>
-                                    <div className={styles["review-avatar"]}>{review.initials}</div>
-                                    <div className={styles["review-id"]}>
-                                        <p>{review.name}</p>
-                                        <StarRow rating={review.rating} />
-                                    </div>
-                                    <span>{review.date}</span>
-                                </div>
-                                <p className={styles["review-text"]}>"{review.text}"</p>
-                                <button className={styles["review-useful"]}><ThumbsUp width={12} height={12} /> Útil</button>
+                                ))}
                             </div>
-                        ))}
+                        )}
                     </div>
-                    {court.reviews.length > 2 && (
-                        <button onClick={() => setShowAllReviews(!showAllReviews)} className={styles["more-reviews"]}>
-                            {showAllReviews ? "Ver menos" : `Ver todas as ${court.reviews.length} avaliações`}
-                        </button>
+                    {reviews.length === 0 ? (
+                        <p className={styles["desc"]}>Essa arena ainda não tem avaliações.</p>
+                    ) : (
+                        <>
+                            <div className={styles["reviews"]}>
+                                {visibleReviews.map((review) => (
+                                    <div key={review.id} className={styles["review"]}>
+                                        <div className={styles["review-head"]}>
+                                            <div className={styles["review-avatar"]}>{initialsOf(review.user_name)}</div>
+                                            <div className={styles["review-id"]}>
+                                                <p>{review.user_name ?? "Jogador"}</p>
+                                                <StarRow rating={review.rating} />
+                                            </div>
+                                            <span>{new Date(review.created_at).toLocaleDateString("pt-BR")}</span>
+                                        </div>
+                                        {review.comment && <p className={styles["review-text"]}>"{review.comment}"</p>}
+                                        <button className={styles["review-useful"]}><ThumbsUp width={12} height={12} /> Útil ({review.helpful_count})</button>
+                                    </div>
+                                ))}
+                            </div>
+                            {reviews.length > 2 && (
+                                <button onClick={() => setShowAllReviews(!showAllReviews)} className={styles["more-reviews"]}>
+                                    {showAllReviews ? "Ver menos" : `Ver todas as ${reviews.length} avaliações`}
+                                </button>
+                            )}
+                        </>
                     )}
                 </section>
             </main>
@@ -193,7 +244,7 @@ export function CourtDetail({ courtId, onNavigate }: CourtDetailProps) {
                 <div className={styles["cta-inner"]}>
                     <div className={styles["cta-price"]}>
                         <span>A partir de</span>
-                        <strong>{court.price}</strong>
+                        <strong>{formatPriceCents(cheapestCourt)}</strong>
                     </div>
                     <button onClick={() => onNavigate("schedule")} className={styles["cta-btn"]}>
                         Escolher horário <ArrowRight width={18} height={18} />

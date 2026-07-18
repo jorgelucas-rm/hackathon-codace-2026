@@ -1,37 +1,40 @@
-import { useState } from "react";
-import { MapPin, Search, SlidersHorizontal, X, Heart, Navigation, Trophy, Star, ArrowUpDown, ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { MapPin, Search, SlidersHorizontal, X, Heart, Navigation, Trophy, Star, ArrowRight, Loader2 } from "lucide-react";
 import { Screen } from "../../types";
-import { getCourtsSync } from "../../services/courts.service";
+import { formatPriceCents } from "../../services/companies.service";
+import { useCompanySearch, useSports } from "../../hooks/useCompanies";
 import styles from "./Courts.module.scss";
 
 interface CourtsProps {
     onNavigate: (screen: Screen) => void;
     onSelectCourt: (id: number) => void;
     initialSearch?: string;
+    initialSportId?: number | null;
 }
 
-const SPORT_FILTERS = ["Todos", "Beach Tennis", "Futebol", "Futsal", "Basquete", "Tênis", "Padel"];
-
-export function Courts({ onNavigate, onSelectCourt, initialSearch = "" }: CourtsProps) {
+export function Courts({ onNavigate, onSelectCourt, initialSearch = "", initialSportId = null }: CourtsProps) {
     const [search, setSearch] = useState(initialSearch);
-    const [activeFilter, setActiveFilter] = useState("Todos");
+    const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
+    const [activeSportId, setActiveSportId] = useState<number | null>(initialSportId);
     const [favs, setFavs] = useState<number[]>([]);
-    const courts = getCourtsSync();
 
-    const filtered = courts.filter((c) => {
-        const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.neighborhood.toLowerCase().includes(search.toLowerCase());
-        const matchFilter = activeFilter === "Todos" || c.sports.some((s) => s.toLowerCase().includes(activeFilter.toLowerCase()));
-        return matchSearch && matchFilter;
-    });
+    // Debounce da busca por texto — evita 1 request por tecla digitada.
+    useEffect(() => {
+        const timeout = setTimeout(() => setDebouncedSearch(search), 400);
+        return () => clearTimeout(timeout);
+    }, [search]);
+
+    const { data: sports } = useSports();
+    const {
+        data: page,
+        isLoading,
+        isError,
+    } = useCompanySearch({ q: debouncedSearch || undefined, sportId: activeSportId, size: 20 });
+
+    const companies = page?.items ?? [];
 
     const toggleFav = (id: number) => {
         setFavs((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-    };
-
-    const slotClass = (status: string) => {
-        if (status === "reservado" || status === "privada" || status === "indisponivel") return styles["slot-busy"];
-        if (status === "ultimas") return styles["slot-last"];
-        return styles["slot-free"];
     };
 
     return (
@@ -61,13 +64,19 @@ export function Courts({ onNavigate, onSelectCourt, initialSearch = "" }: Courts
                     </div>
 
                     <div className={`scrollbar-none ${styles["filters-row"]}`}>
-                        {SPORT_FILTERS.map((f) => (
+                        <button
+                            onClick={() => setActiveSportId(null)}
+                            className={`${styles["filter"]} ${activeSportId === null ? styles["filter-active"] : ""}`}
+                        >
+                            Todos
+                        </button>
+                        {(sports ?? []).map((sport) => (
                             <button
-                                key={f}
-                                onClick={() => setActiveFilter(f)}
-                                className={`${styles["filter"]} ${activeFilter === f ? styles["filter-active"] : ""}`}
+                                key={sport.id}
+                                onClick={() => setActiveSportId(sport.id)}
+                                className={`${styles["filter"]} ${activeSportId === sport.id ? styles["filter-active"] : ""}`}
                             >
-                                {f}
+                                {sport.icon ? `${sport.icon} ` : ""}{sport.name}
                             </button>
                         ))}
                     </div>
@@ -76,60 +85,54 @@ export function Courts({ onNavigate, onSelectCourt, initialSearch = "" }: Courts
 
             <main className={styles["inner"]}>
                 <div className={styles["results-head"]}>
-                    <p className={styles["results-count"]}><strong>{filtered.length}</strong> quadras encontradas</p>
-                    <button className={styles["sort-btn"]}><ArrowUpDown width={14} height={14} /> Ordenar</button>
+                    <p className={styles["results-count"]}><strong>{page?.total_filtered ?? 0}</strong> arenas encontradas</p>
                 </div>
 
                 <div className={styles["grid"]}>
-                    {filtered.map((court) => (
+                    {companies.map((company) => (
                         <article
-                            key={court.id}
-                            onClick={() => { onSelectCourt(court.id); onNavigate("courtDetail"); }}
+                            key={company.id}
+                            onClick={() => { onSelectCourt(company.id); onNavigate("courtDetail"); }}
                             className={styles["court-card"]}
                         >
-                            <div className={styles["court-img"]} style={{ background: court.gradient }}>
-                                <Trophy width={52} height={52} />
+                            <div
+                                className={styles["court-img"]}
+                                style={company.cover_photo
+                                    ? { backgroundImage: `url(${company.cover_photo})`, backgroundSize: "cover", backgroundPosition: "center" }
+                                    : { background: "linear-gradient(135deg, rgba(173,153,0,0.2), #E8D7BD)" }}
+                            >
+                                {!company.cover_photo && <Trophy width={52} height={52} />}
                                 <div className={styles["img-fade"]} />
-                                {court.premium && <span className={styles["premium-tag"]}>PREMIUM</span>}
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); toggleFav(court.id); }}
-                                    className={`${styles["fav"]} ${favs.includes(court.id) ? styles["fav-active"] : ""}`}
+                                    onClick={(e) => { e.stopPropagation(); toggleFav(company.id); }}
+                                    className={`${styles["fav"]} ${favs.includes(company.id) ? styles["fav-active"] : ""}`}
                                     aria-label="Favoritar"
                                 >
                                     <Heart width={16} height={16} />
                                 </button>
-                                <div className={styles["tags"]}>
-                                    {court.sportTags.map((tag) => <span key={tag}>{tag}</span>)}
-                                </div>
                             </div>
 
                             <div className={styles["court-body"]}>
                                 <div className={styles["court-head"]}>
                                     <div className={styles["court-id"]}>
-                                        <h3 className={styles["court-name"]}>{court.name}</h3>
-                                        <p className={styles["court-place"]}><MapPin width={12} height={12} /> {court.neighborhood.split(",")[0]}</p>
+                                        <h3 className={styles["court-name"]}>{company.name}</h3>
                                     </div>
-                                    <span className={styles["rating-badge"]}><Star width={13} height={13} /> {court.rating}</span>
+                                    <span className={styles["rating-badge"]}>
+                                        <Star width={13} height={13} />
+                                        {company.nota_media !== null ? company.nota_media.toFixed(1) : "novo"}
+                                    </span>
                                 </div>
 
                                 <div className={styles["meta-row"]}>
-                                    <span className={styles["reviews"]}>{court.reviewCount} avaliações</span>
-                                    <span className={styles["distance"]}><Navigation width={12} height={12} /> {court.distance}</span>
-                                </div>
-
-                                <div className={styles["slots-row"]}>
-                                    <span className={styles["slot-label"]}>Hoje</span>
-                                    {court.todaySlots.slice(0, 3).map((slot) => (
-                                        <span key={slot.time} className={`${styles["slot"]} ${slotClass(slot.status)}`}>
-                                            {slot.time}
-                                        </span>
-                                    ))}
+                                    {company.distance_km !== null && (
+                                        <span className={styles["distance"]}><Navigation width={12} height={12} /> {company.distance_km.toFixed(1)} km</span>
+                                    )}
                                 </div>
 
                                 <div className={styles["court-foot"]}>
                                     <div className={styles["price-block"]}>
                                         <span className={styles["eyebrow"]}>A partir de</span>
-                                        <strong className={styles["price"]}>{court.price}</strong>
+                                        <strong className={styles["price"]}>{formatPriceCents(company.min_price_hour)}{company.min_price_hour !== null ? "/h" : ""}</strong>
                                     </div>
                                     <span className={styles["go-btn"]}><ArrowRight width={16} height={16} /></span>
                                 </div>
@@ -137,11 +140,25 @@ export function Courts({ onNavigate, onSelectCourt, initialSearch = "" }: Courts
                         </article>
                     ))}
 
-                    {filtered.length === 0 && (
+                    {isLoading && (
+                        <div className={styles["empty"]}>
+                            <Loader2 width={36} height={36} className={styles["empty-icon"]} />
+                            <p>Buscando arenas...</p>
+                        </div>
+                    )}
+
+                    {isError && !isLoading && (
                         <div className={styles["empty"]}>
                             <Search width={44} height={44} className={styles["empty-icon"]} />
-                            <p>Nenhuma quadra encontrada</p>
-                            <button onClick={() => { setSearch(""); setActiveFilter("Todos"); }}>Limpar filtros</button>
+                            <p>Não foi possível carregar as arenas agora.</p>
+                        </div>
+                    )}
+
+                    {!isLoading && !isError && companies.length === 0 && (
+                        <div className={styles["empty"]}>
+                            <Search width={44} height={44} className={styles["empty-icon"]} />
+                            <p>Nenhuma arena encontrada</p>
+                            <button onClick={() => { setSearch(""); setActiveSportId(null); }}>Limpar filtros</button>
                         </div>
                     )}
                 </div>

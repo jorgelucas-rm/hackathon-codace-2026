@@ -15,6 +15,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>("onboarding");
   const [selectedCourtId, setSelectedCourtId] = useState<number>(1);
   const [courtsSearch, setCourtsSearch] = useState("");
+  const [courtsSportId, setCourtsSportId] = useState<number | null>(null);
   const [dark, setDark] = useState(false);
 
   const showNav = !["onboarding", "login", "signup"].includes(screen);
@@ -33,12 +34,20 @@ function App() {
         <Home
           onNavigate={setScreen}
           onSelectCourt={setSelectedCourtId}
-          onSearch={(term) => { setCourtsSearch(term); setScreen("courts"); }}
+          onSelectSport={(sportId) => { setCourtsSportId(sportId); setCourtsSearch(""); setScreen("courts"); }}
+          onSearch={(term) => { setCourtsSearch(term); setCourtsSportId(null); setScreen("courts"); }}
           dark={dark}
           toggleDark={toggleDark}
         />
       )}
-      {screen === "courts" && <Courts onNavigate={setScreen} onSelectCourt={setSelectedCourtId} initialSearch={courtsSearch} />}
+      {screen === "courts" && (
+        <Courts
+          onNavigate={setScreen}
+          onSelectCourt={setSelectedCourtId}
+          initialSearch={courtsSearch}
+          initialSportId={courtsSportId}
+        />
+      )}
       {screen === "courtDetail" && <CourtDetail courtId={selectedCourtId} onNavigate={setScreen} />}
       {screen === "schedule" && <Schedule onNavigate={setScreen} />}
       {screen === "match" && <Match onNavigate={setScreen} />}

@@ -1,39 +1,30 @@
 import { useState } from "react";
 import {
     MapPin, Search, SlidersHorizontal, Calendar, Clock, Users, ArrowRight,
-    ChevronRight, Star, Moon, Sun, User, Plus,
-    CircleDot, Activity, Dumbbell, Zap, Volleyball, Waves, Trophy,
+    ChevronRight, Star, Moon, Sun, User, Trophy, Activity,
 } from "lucide-react";
 import { Screen } from "../../types";
-import { getCourtsSync } from "../../services/courts.service";
+import { formatPriceCents } from "../../services/companies.service";
 import { getOpenMatchesSync } from "../../services/matches.service";
 import { useMe } from "../../hooks/useMe";
+import { useCompanySearch, useSports } from "../../hooks/useCompanies";
 import styles from "./Home.module.scss";
 
 interface HomeProps {
     onNavigate: (screen: Screen) => void;
     onSelectCourt: (id: number) => void;
+    onSelectSport: (sportId: number) => void;
     onSearch: (term: string) => void;
     dark: boolean;
     toggleDark: () => void;
 }
 
-const SPORTS = [
-    { Icon: CircleDot, name: "Futebol", courts: 24 },
-    { Icon: Activity, name: "Futsal", courts: 18 },
-    { Icon: Dumbbell, name: "Basquete", courts: 9 },
-    { Icon: Zap, name: "Vôlei", courts: 11 },
-    { Icon: Volleyball, name: "Tênis", courts: 16 },
-    { Icon: Waves, name: "Beach Tennis", courts: 14 },
-    { Icon: Trophy, name: "Padel", courts: 7 },
-    { Icon: Plus, name: "Outros", courts: 15 },
-];
-
-export function Home({ onNavigate, onSelectCourt, onSearch, dark, toggleDark }: HomeProps) {
+export function Home({ onNavigate, onSelectCourt, onSelectSport, onSearch, dark, toggleDark }: HomeProps) {
     const [searchTerm, setSearchTerm] = useState("");
-    const courts = getCourtsSync();
+    const { data: sports } = useSports();
+    const { data: companiesPage } = useCompanySearch({ size: 6 });
+    const recommended = companiesPage?.items ?? [];
     const matches = getOpenMatchesSync();
-    const recommended = courts.slice(0, 6);
     const { data: me } = useMe();
     const firstName = me?.entity?.name?.split(" ")[0] ?? "";
 
@@ -98,11 +89,10 @@ export function Home({ onNavigate, onSelectCourt, onSearch, dark, toggleDark }: 
                         </div>
                     </div>
                     <div className={styles["sports-grid"]}>
-                        {SPORTS.map((sport) => (
-                            <button key={sport.name} onClick={() => onNavigate("courts")} className={styles["sport-tile"]}>
-                                <span className={styles["sport-icon"]}><sport.Icon width={20} height={20} /></span>
+                        {(sports ?? []).map((sport) => (
+                            <button key={sport.id} onClick={() => onSelectSport(sport.id)} className={styles["sport-tile"]}>
+                                <span className={styles["sport-icon"]}>{sport.icon ?? <Trophy width={20} height={20} />}</span>
                                 <span className={styles["sport-name"]}>{sport.name}</span>
-                                <span className={styles["sport-count"]}>{sport.courts} quadras</span>
                             </button>
                         ))}
                     </div>
@@ -159,33 +149,39 @@ export function Home({ onNavigate, onSelectCourt, onSearch, dark, toggleDark }: 
                         </button>
                     </div>
                     <div className={styles["courts-grid"]}>
-                        {recommended.map((court) => (
+                        {recommended.map((company) => (
                             <article
-                                key={court.id}
-                                onClick={() => { onSelectCourt(court.id); onNavigate("courtDetail"); }}
+                                key={company.id}
+                                onClick={() => { onSelectCourt(company.id); onNavigate("courtDetail"); }}
                                 className={styles["court-card"]}
                             >
-                                <div className={styles["court-img"]} style={{ background: court.gradient }}>
-                                    <Trophy width={46} height={46} />
-                                    {court.premium && <span className={styles["premium-tag"]}>PREMIUM</span>}
-                                    <span className={styles["court-distance"]}><MapPin width={12} height={12} /> {court.distance}</span>
+                                <div
+                                    className={styles["court-img"]}
+                                    style={company.cover_photo
+                                        ? { backgroundImage: `url(${company.cover_photo})`, backgroundSize: "cover", backgroundPosition: "center" }
+                                        : { background: "linear-gradient(135deg, rgba(173,153,0,0.15), #E8D7BD)" }}
+                                >
+                                    {!company.cover_photo && <Trophy width={46} height={46} />}
+                                    {company.distance_km !== null && (
+                                        <span className={styles["court-distance"]}><MapPin width={12} height={12} /> {company.distance_km.toFixed(1)} km</span>
+                                    )}
                                 </div>
                                 <div className={styles["court-body"]}>
                                     <div className={styles["court-head"]}>
-                                        <p className={styles["court-name"]}>{court.name}</p>
-                                        <span className={styles["rating-badge"]}><Star width={14} height={14} /> {court.rating}</span>
-                                    </div>
-                                    <p className={styles["court-place"]}>{court.neighborhood}</p>
-                                    <div className={styles["court-tags"]}>
-                                        {court.sportTags.map((t) => <span key={t} className={styles["tag"]}>{t}</span>)}
+                                        <p className={styles["court-name"]}>{company.name}</p>
+                                        <span className={styles["rating-badge"]}>
+                                            <Star width={14} height={14} />
+                                            {company.nota_media !== null ? company.nota_media.toFixed(1) : "novo"}
+                                        </span>
                                     </div>
                                     <div className={styles["court-foot"]}>
-                                        <span className={styles["price"]}>{court.price}</span>
-                                        <span className={styles["review-count"]}>{court.reviewCount} avaliações</span>
+                                        <span className={styles["price"]}>{formatPriceCents(company.min_price_hour)}{company.min_price_hour !== null ? "/h" : ""}</span>
                                     </div>
                                 </div>
                             </article>
                         ))}
+
+                        {recommended.length === 0 && <p>Nenhuma arena cadastrada ainda.</p>}
                     </div>
                 </section>
             </main>
