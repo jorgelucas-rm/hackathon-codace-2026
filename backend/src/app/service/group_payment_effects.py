@@ -23,7 +23,21 @@ from src.app.model.enum.group_status import GroupStatus
 from src.app.repository.booking_repository import BookingRepository
 from src.app.repository.group_member_repository import GroupMemberRepository
 from src.app.repository.group_repository import GroupRepository
+from src.app.repository.notification_repository import NotificationRepository
+from src.app.service.notification_service import NotificationService
 from src.app.service.payment_service import register_effect_handler
+
+# T-E (Onda 4): instrumentação pontual aditiva — só chamadas a
+# `notification_service.create(...)`, sem mudar a lógica existente.
+# Decisão de "um lugar por evento" (evitar duplicar com `group_service.py`):
+# - "alguém entrou" (`group_joined`) e "grupo completo" (`group_full`) só
+#   fazem sentido quando a cota é de fato aprovada — o único ponto que sabe
+#   disso é este handler (`on_group_member_approved`), não
+#   `group_service.join` (que só cria o `PENDING`).
+# - "grupo cancelado" (`group_canceled`) por recusa da cota do CRIADOR é
+#   tratado aqui (`on_group_member_denied`) porque esse caminho cancela o
+#   grupo diretamente, sem passar por `GroupService.cancel_group` (que é
+#   quem notifica os demais casos de cancelamento, em `group_service.py`).
 
 
 def on_group_member_approved(reference_id: int, session: Session) -> None:
@@ -48,6 +62,32 @@ def on_group_member_approved(reference_id: int, session: Session) -> None:
     if not group:
         return
 
+    notification_service = NotificationService(
+        notification_repository=NotificationRepository(session=session)
+    )
+    booking_repository = BookingRepository(session=session)
+    booking = booking_repository.get_by_pk(pk=group.booking_id)
+
+    if (
+        booking
+        and booking.creator_user_id is not None
+        and booking.creator_user_id != member.user_id
+    ):
+        # Avisa o criador que alguém entrou (confirmou a cota) no grupo —
+        # backend-api-e-fluxos.md §3.3: "Notificação aos membros: 'fulano
+        # entrou (7/10)'" — MVP: só o criador (dono do agendamento), não
+        # todos os membros, para não disparar N notificações a cada entrada.
+        filled = member_repository.count_confirmed(group.id)
+        notification_service.create(
+            user_id=booking.creator_user_id,
+            type="group_joined",
+            title="Alguém entrou no seu grupo",
+            body=f"Seu grupo agora tem {filled}/{group.total_spots} confirmados.",
+            reference_type="group",
+            reference_id=group.id,
+            session=session,
+        )
+
     if group.status != GroupStatus.OPEN:
         return
 
@@ -56,11 +96,23 @@ def on_group_member_approved(reference_id: int, session: Session) -> None:
         group.status = GroupStatus.FULL
         group_repository.add(entity=group)
 
-        booking_repository = BookingRepository(session=session)
-        booking = booking_repository.get_by_pk(pk=group.booking_id)
         if booking and booking.status == BookingStatus.PENDING:
             booking.status = BookingStatus.CONFIRMED
             booking_repository.add(entity=booking)
+
+        # Grupo completou todas as vagas -> jogo confirmado. Avisa todos os
+        # membros confirmados (backend-api-e-fluxos.md §3.3: "Notificação a
+        # todos: 'grupo completo, jogo confirmado!'").
+        for confirmed_member in member_repository.get_confirmed_by_group(group.id):
+            notification_service.create(
+                user_id=confirmed_member.user_id,
+                type="group_full",
+                title="Grupo completo!",
+                body="Todas as vagas foram preenchidas — o jogo está confirmado.",
+                reference_type="group",
+                reference_id=group.id,
+                session=session,
+            )
 
 
 def on_group_member_denied(reference_id: int, session: Session) -> None:
@@ -103,6 +155,23 @@ def on_group_member_denied(reference_id: int, session: Session) -> None:
 
         group.status = GroupStatus.CANCELED
         group_repository.add(entity=group)
+
+        # Cascata não passa por `GroupService.cancel_group` (é inline aqui),
+        # então a notificação também precisa ser aqui — único membro
+        # afetado nesse ponto é o próprio criador (nenhum outro membro pode
+        # ter cota aprovada antes da cota do criador ser resolvida).
+        notification_service = NotificationService(
+            notification_repository=NotificationRepository(session=session)
+        )
+        notification_service.create(
+            user_id=member.user_id,
+            type="group_canceled",
+            title="Grupo cancelado",
+            body="Seu pagamento foi recusado e o grupo foi cancelado.",
+            reference_type="group",
+            reference_id=group.id,
+            session=session,
+        )
 
 
 register_effect_handler("group_member", on_group_member_approved, on_group_member_denied)
