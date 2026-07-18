@@ -13,6 +13,7 @@ from src.app.model.dto.company import CompanyReadDTO
 from src.app.model.dto.user import UserReadDTO
 from src.app.model.enum import AuthType, ErrorCode, Level
 from src.app.repository import CompanyRepository, UserRepository
+from src.app.service.photo_upload import resolve_photo_urls
 from src.infra.context import RequestContext
 from src.infra.exception import NotFoundException, UnauthorizedException
 from src.infra.security import JWTService, verify_password
@@ -106,9 +107,9 @@ class AuthService:
         if company is None:
             raise NotFoundException(resource="Company", error_code=ErrorCode.NOT_FOUND)
 
-        return MeCompanyReadDTO(
-            entity=CompanyReadDTO.model_validate(company),
-        )
+        entity = CompanyReadDTO.model_validate(company)
+        entity.photos = resolve_photo_urls(self.minio_adapter, company.photos or [])
+        return MeCompanyReadDTO(entity=entity)
 
     @staticmethod
     def get_service(

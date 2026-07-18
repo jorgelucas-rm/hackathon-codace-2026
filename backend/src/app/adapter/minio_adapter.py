@@ -56,13 +56,16 @@ class MinioAdapter:
             if e.code not in ("NoSuchKey", "NoSuchBucket"):
                 raise StorageException(message=f"Could not delete file: {e.message}")
 
+    def _ensure_bucket(self) -> None:
+        if not self.minio_client.bucket_exists(MINIO_DEFAULT_BUCKET):
+            self.minio_client.make_bucket(MINIO_DEFAULT_BUCKET)
+
     def upload_file_to_minio(
         self,
         file: UploadFile,
         object_name: str,
     ) -> str:
-        if not self.minio_client.bucket_exists(MINIO_DEFAULT_BUCKET):
-            self.minio_client.make_bucket(MINIO_DEFAULT_BUCKET)
+        self._ensure_bucket()
 
         content = file.file.read()
         content_type = file.content_type or "application/octet-stream"

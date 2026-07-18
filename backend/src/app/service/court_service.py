@@ -1,5 +1,6 @@
-from fastapi import Depends
+from fastapi import Depends, UploadFile
 
+from src.app.adapter import MinioAdapter
 from src.app.model.dto.court import (
     CompanySummaryDTO,
     CourtCreateDTO,
@@ -12,7 +13,10 @@ from src.app.model.entity.sport import Sport
 from src.app.model.enum import ErrorCode
 from src.app.repository.court_repository import CourtRepository
 from src.app.repository.sport_repository import SportRepository
+from src.app.service.photo_upload import resolve_photo_urls, validate_and_upload_photo
 from src.infra.exception import ForbiddenException, NotFoundException
+
+COURT_PHOTO_OBJECT_PREFIX = "court/"
 
 
 class CourtService:
@@ -21,12 +25,18 @@ class CourtService:
         self,
         court_repository: CourtRepository,
         sport_repository: SportRepository,
+        minio_adapter: MinioAdapter,
     ):
         self.court_repository = court_repository
         self.sport_repository = sport_repository
+        self.minio_adapter = minio_adapter
 
     def to_read_dto(self, court: Court) -> CourtReadDTO:
-        return CourtReadDTO.model_validate(court)
+        """`photos` sempre expõe URLs pré-assinadas resolvidas na hora — mesmo
+        padrão de `UserService.to_read_dto`/`CompanyService.to_read_dto`."""
+        dto = CourtReadDTO.model_validate(court)
+        dto.photos = resolve_photo_urls(self.minio_adapter, court.photos or [])
+        return dto
 
     def list_by_company(self, company_id: int) -> list[CourtReadDTO]:
         courts = self.court_repository.get_by_company(company_id)
@@ -51,7 +61,6 @@ class CourtService:
             company_id=company_id,
             name=dto.name,
             capacity=dto.capacity,
-            photos=dto.photos,
             base_price_hour=dto.base_price_hour,
             sports=sports,
         )
@@ -75,6 +84,38 @@ class CourtService:
 
         return self.court_repository.save(entity=court)
 
+    def add_photo(self, court_id: int, company_id: int, file: UploadFile) -> Court:
+        court = self.get_by_id(court_id)
+        if court.company_id != company_id:
+            raise ForbiddenException(
+                message="You do not own this court",
+                error_code=ErrorCode.RESOURCE_NOT_OWNED,
+            )
+
+        object_name = validate_and_upload_photo(
+            self.minio_adapter, file, object_prefix=f"{COURT_PHOTO_OBJECT_PREFIX}{court_id}/"
+        )
+        court.photos = [*(court.photos or []), object_name]
+        return self.court_repository.save(entity=court)
+
+    def remove_photo(self, court_id: int, company_id: int, index: int) -> Court:
+        court = self.get_by_id(court_id)
+        if court.company_id != company_id:
+            raise ForbiddenException(
+                message="You do not own this court",
+                error_code=ErrorCode.RESOURCE_NOT_OWNED,
+            )
+
+        photos = list(court.photos or [])
+        if index < 0 or index >= len(photos):
+            raise NotFoundException(resource="Photo", error_code=ErrorCode.NOT_FOUND)
+
+        object_name = photos.pop(index)
+        court.photos = photos
+        court = self.court_repository.save(entity=court)
+        self.minio_adapter.delete_file_from_minio(object_name=object_name)
+        return court
+
     def _resolve_sports(self, sport_ids: list[int]) -> list[Sport]:
         if not sport_ids:
             return []
@@ -90,8 +131,10 @@ class CourtService:
     def get_service(
         court_repository: CourtRepository = Depends(CourtRepository.get_instance()),
         sport_repository: SportRepository = Depends(SportRepository.get_instance()),
+        minio_adapter: MinioAdapter = Depends(MinioAdapter.get_instance),
     ) -> "CourtService":
         return CourtService(
             court_repository=court_repository,
             sport_repository=sport_repository,
+            minio_adapter=minio_adapter,
         )
