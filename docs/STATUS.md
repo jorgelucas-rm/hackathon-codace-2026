@@ -10,7 +10,7 @@ orquestrador conforme `docs/prompt-orquestrador.md`. Branch de integração:
 |---|---|---|
 | 0 | Fundação (constantes, ErrorCodes, transação, tests/conftest.py) | ✅ concluída |
 | 1 | T-A1 Catálogo ∥ T-A2 Perfil+Favoritos | ✅ concluída |
-| 2 | T-B1 Booking+Disponibilidade ∥ T-B2 Pagamento | ⏳ em andamento |
+| 2 | T-B1 Booking+Disponibilidade ∥ T-B2 Pagamento | ✅ concluída |
 | 3 | T-C Grupos ∥ T-D Painel | ⏳ pendente |
 | 4 | T-E Notif+Job ∥ T-F Reviews+Seed | ⏳ pendente |
 
@@ -248,3 +248,47 @@ booking `confirmed`; pagamento recusado → booking `canceled` e horário
 liberado; pendente expirado (mock de `created_at` no passado) some da
 disponibilidade; corrida de dois bookings no mesmo slot → um leva
 `SLOT_UNAVAILABLE`.
+
+## Onda 2 — concluída
+
+Merge `T-B2 → T-B1` sem conflitos (arquivos disjuntos por construção — T-B2
+só tocou `payment_service.py`/`payment_controller.py`/`dto/payment.py`;
+T-B1 só tocou os arquivos de `booking`/`availability`). Ambos entregaram
+qualidade alta: T-B2 implementou `confirm`/`refund` exatamente contra o
+contrato (idempotência, split, `PAYMENT_ALREADY_RESOLVED`); T-B1 implementou
+lock por `SELECT...FOR UPDATE` na `Court`, `generate_slots` como função pura
+testada isoladamente, e já deixou o gancho de `type=group` (`INVALID_STATE`)
+e o cancelamento parametrizado por ator, prontos para a Onda 3.
+
+REGISTRAR aplicado pelo orquestrador:
+
+- `controller/__init__.py`: registrados `booking_controller.router`,
+  `booking_controller.me_router`, `availability_controller.router`,
+  `payment_controller.router`.
+- `model/entity/__init__.py`: registrado `Booking`.
+- `repository/__init__.py`: registrado `BookingRepository`.
+- `service/__init__.py`: `from . import booking_payment_effects  # noqa: F401`
+  — necessário para o `register_effect_handler("booking", ...)` rodar no
+  boot da app (import side-effect); sem isso, `PaymentService.confirm`
+  levantaria `KeyError` ao tentar aprovar/recusar um pagamento de booking.
+- Migração `1aef7416bb48_onda_2_payment_booking` (Alembic, autogenerate +
+  correção manual do import duplicado de `sqlalchemy`, mesmo problema já
+  visto na migração da Onda 1): tabelas `payment` e `booking` novas
+  (`ix_booking_court_id_date` para as queries de sobreposição/disponibilidade).
+  Aplicada e testada (`alembic upgrade head` a partir de `0d5b73afd62a`).
+- `tests/test_onda2_integration.py` (novo, escrito pelo orquestrador): cadeia
+  completa via rotas reais — aprovação confirma booking e grava split
+  íntegro (`platform_fee + gateway_fee + company_payout == amount`); recusa
+  cancela booking (`reason=payment_denied`) e libera o slot na
+  disponibilidade; confirmação é idempotente mesmo tentando um `result`
+  diferente na segunda chamada (mantém o primeiro estado resolvido). Esses
+  cenários não podiam ser testados por nenhum executor sozinho (cada um só
+  tinha o outro lado como contrato/stub).
+
+**Verificação de pronto da onda**: `pytest` (54 passed — 45 de T-B1, 6 de
+T-B2, 3 de integração), app sobe (`uvicorn`) contra o banco dev com a
+migração aplicada, `/docs` e `/openapi.json` respondem 200, `/api/sports`
+ok. Rotas novas confirmadas no `openapi.json`: `/api/bookings`,
+`/api/bookings/{id}`, `/api/bookings/{id}/cancel`, `/api/users/me/bookings`,
+`/api/courts/{id}/availability`, `/api/payments/{id}`,
+`/api/payments/{id}/confirm`.
