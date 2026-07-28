@@ -1,0 +1,48 @@
+services:
+  frontend:
+    container_name: codace-frontend
+    ports:
+      - "8081:80"
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    container_name: codace-backend
+    ports:
+      - "8082:8080"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      - database
+      - minio
+    restart: unless-stopped
+
+  database:
+    container_name: codace-database
+    image: postgres:18
+    ports:
+      - "5433:5432"
+    env_file: ./backend/src/environments/.env
+    restart: unless-stopped
+    volumes:
+      - /data/projects/reservae/database:/var/lib/postgresql
+
+  minio:
+    container_name: codace-minio
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file: ./backend/src/environments/.env
+    command: >
+      server /data
+      --address ":9000"
+      --console-address ":9001"
+    restart: unless-stopped
+    volumes:
+      - /data/projects/reservae/minio:/data
